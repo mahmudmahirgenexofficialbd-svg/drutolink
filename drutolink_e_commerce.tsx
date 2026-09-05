@@ -3,6 +3,7 @@ import {
   Search, Camera, ShoppingCart, User, Menu, MapPin, Phone, CreditCard, 
   LayoutDashboard, ShoppingBag, Package, CheckCircle, Plus, Upload, ArrowLeft 
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- ADMIN DASHBOARD COMPONENT ---
 function AdminDashboard({ goHome }) {
@@ -113,7 +114,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <>
+      <Analytics />
+      <div className="min-h-screen bg-gray-50 font-sans">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -178,5 +181,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </>
   );
 }
