@@ -13,7 +13,7 @@ function AdminDashboard({ goHome, products, setProducts }) {
   const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
 
-  // Handle image file upload to base64 so it previews and saves locally
+  // Handle image file upload from PC
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -36,7 +36,7 @@ function AdminDashboard({ goHome, products, setProducts }) {
       id: Date.now(),
       title,
       price,
-      image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60' // fallback placeholder
+      image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60'
     };
 
     const updatedProducts = [newProduct, ...products];
@@ -159,17 +159,23 @@ function AdminDashboard({ goHome, products, setProducts }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleImageUpload} 
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" 
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Upload Product Image from PC</label>
+                    {/* Fixed direct file input field */}
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload} 
+                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-700 cursor-pointer" 
+                      />
+                    </div>
                     {image && (
-                      <div className="mt-2">
-                        <p className="text-xs text-green-600 mb-1">Image loaded successfully:</p>
-                        <img src={image} alt="Preview" className="h-20 w-20 object-cover rounded border" />
+                      <div className="mt-3 flex items-center space-x-3 bg-violet-50 p-3 rounded-lg border border-violet-100">
+                        <img src={image} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                        <div>
+                          <p className="text-xs font-bold text-violet-700">Image Ready to Publish!</p>
+                          <p className="text-[10px] text-gray-500">File loaded successfully into memory.</p>
+                        </div>
                       </div>
                     )}
                   </div>
