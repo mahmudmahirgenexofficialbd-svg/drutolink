@@ -1,12 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, Camera, ShoppingCart, User, Menu, MapPin, Phone, CreditCard, 
-  LayoutDashboard, ShoppingBag, Package, CheckCircle, Plus, Upload, ArrowLeft, Lock, Key 
+  LayoutDashboard, ShoppingBag, Package, CheckCircle, Plus, Upload, ArrowLeft, Lock, Key, Trash2 
 } from 'lucide-react';
 
 // --- SECURE ADMIN DASHBOARD ---
-function AdminDashboard({ goHome }) {
+function AdminDashboard({ goHome, products, setProducts }) {
   const [activeTab, setActiveTab] = useState('orders');
+  
+  // New product form state
+  const [title, setTitle] = useState('');
+  const [price, setPrice] = useState('');
+  const [image, setImage] = useState('');
+
+  // Handle image file upload to base64 so it previews and saves locally
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddProduct = (e) => {
+    e.preventDefault();
+    if (!title || !price) {
+      alert('Please fill in the product title and price.');
+      return;
+    }
+
+    const newProduct = {
+      id: Date.now(),
+      title,
+      price,
+      image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60' // fallback placeholder
+    };
+
+    const updatedProducts = [newProduct, ...products];
+    setProducts(updatedProducts);
+    localStorage.setItem('drutolink_products', JSON.stringify(updatedProducts));
+
+    // Reset form
+    setTitle('');
+    setPrice('');
+    setImage('');
+    alert('Product successfully added and published to the store!');
+    setActiveTab('orders');
+  };
+
+  const handleDeleteProduct = (id) => {
+    const updatedProducts = products.filter(p => p.id !== id);
+    setProducts(updatedProducts);
+    localStorage.setItem('drutolink_products', JSON.stringify(updatedProducts));
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans w-full">
@@ -24,7 +73,7 @@ function AdminDashboard({ goHome }) {
           </button>
           <button onClick={() => setActiveTab('products')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:bg-[#1A1A1A]'}`}>
             <Package className="h-5 w-5" />
-            <span>Products</span>
+            <span>Products ({products.length})</span>
           </button>
         </nav>
         <div className="p-4 border-t border-gray-800">
@@ -39,7 +88,7 @@ function AdminDashboard({ goHome }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-800 border-b-2 border-violet-500 pb-1">
-            {activeTab === 'orders' ? 'Order Management' : 'Product Inventory'}
+            {activeTab === 'orders' ? 'Order Management' : 'Product Inventory Management'}
           </h2>
           <span className="text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full">Securely Logged In</span>
         </header>
@@ -84,16 +133,75 @@ function AdminDashboard({ goHome }) {
           )}
 
           {activeTab === 'products' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
-              <h3 className="text-lg font-bold mb-4">Add New Product</h3>
-              <div className="space-y-4">
-                <input type="text" className="w-full border rounded-lg p-2.5 outline-none focus:border-violet-500" placeholder="Product Title" />
-                <input type="number" className="w-full border rounded-lg p-2.5 outline-none focus:border-violet-500" placeholder="Price (BDT)" />
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:bg-gray-50">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Upload image from PC</p>
-                </div>
-                <button className="w-full bg-violet-600 text-white font-bold py-3 rounded-lg hover:bg-violet-700">Save Product</button>
+            <div className="space-y-8">
+              {/* Add Product Form */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
+                <h3 className="text-lg font-bold mb-4">Add New Wholesale Product</h3>
+                <form onSubmit={handleAddProduct} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Title</label>
+                    <input 
+                      type="text" 
+                      value={title} 
+                      onChange={(e) => setTitle(e.target.value)} 
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-violet-500" 
+                      placeholder="e.g., Putian Sports Shoes" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (BDT)</label>
+                    <input 
+                      type="number" 
+                      value={price} 
+                      onChange={(e) => setPrice(e.target.value)} 
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-violet-500" 
+                      placeholder="2500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload} 
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" 
+                    />
+                    {image && (
+                      <div className="mt-2">
+                        <p className="text-xs text-green-600 mb-1">Image loaded successfully:</p>
+                        <img src={image} alt="Preview" className="h-20 w-20 object-cover rounded border" />
+                      </div>
+                    )}
+                  </div>
+                  <button type="submit" className="w-full bg-violet-600 text-white font-bold py-3 rounded-lg hover:bg-violet-700 transition-colors">
+                    Save & Publish Product
+                  </button>
+                </form>
+              </div>
+
+              {/* Existing Products List in Admin */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-bold mb-4">Active Catalog ({products.length} Items)</h3>
+                {products.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No products added yet. Use the form above to add your first product!</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {products.map(p => (
+                      <div key={p.id} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
+                        <div className="flex items-center space-x-3">
+                          <img src={p.image} alt={p.title} className="h-12 w-12 object-cover rounded" />
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-800 line-clamp-1">{p.title}</h4>
+                            <p className="text-xs text-violet-600 font-semibold">৳ {p.price}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1">
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -108,6 +216,18 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   
+  // Persistent Products State loaded from LocalStorage
+  const [products, setProducts] = useState(() => {
+    const saved = localStorage.getItem('drutolink_products');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return []; }
+    }
+    return [
+      { id: 1, title: 'Putian Shox Sports Shoes', price: '2760', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=60' },
+      { id: 2, title: 'Multi-Compartment Casual Crossbody Bag', price: '4148', image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=500&auto=format&fit=crop&q=60' }
+    ];
+  });
+  
   // Admin Login States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -115,7 +235,6 @@ export default function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    // SET YOUR SECRET PASSWORD HERE (Change 'mahir123' to whatever secret password you want)
     if (passwordInput === 'mahir123') {
       setIsAdminLoggedIn(true);
       setLoginError(false);
@@ -124,12 +243,10 @@ export default function App() {
     }
   };
 
-  // If view is admin and they are logged in, show dashboard
   if (currentView === 'admin' && isAdminLoggedIn) {
-    return <AdminDashboard goHome={() => setCurrentView('home')} />;
+    return <AdminDashboard goHome={() => setCurrentView('home')} products={products} setProducts={setProducts} />;
   }
 
-  // If view is admin but they are NOT logged in, show Password Lock Screen
   if (currentView === 'admin' && !isAdminLoggedIn) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans px-4">
@@ -218,13 +335,25 @@ export default function App() {
           <button className="w-full bg-violet-600 text-white font-bold py-4 rounded-xl hover:bg-violet-700 text-lg">Confirm Wholesale Order</button>
         </div>
       ) : (
-        <div className="container mx-auto px-4 py-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Wholesale Products from China</h2>
-          <p className="text-gray-500 mb-8">Welcome to DrutoLink. High-speed importing made simple.</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-64 flex items-center justify-center text-gray-300">
-                <Camera className="h-10 w-10" />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Wholesale Products from China</h2>
+            <p className="text-gray-500">Click the "Admin" button on top to securely log in and upload products.</p>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {products.map(p => (
+              <div key={p.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                <img src={p.image} alt={p.title} className="h-48 w-full object-cover" />
+                <div className="p-4 flex flex-col flex-1 justify-between">
+                  <h3 className="font-semibold text-gray-800 text-sm mb-2">{p.title}</h3>
+                  <div className="flex items-center justify-between mt-auto">
+                    <span className="text-violet-600 font-bold text-base">৳ {p.price}</span>
+                    <button className="bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors">
+                      Buy Now
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
