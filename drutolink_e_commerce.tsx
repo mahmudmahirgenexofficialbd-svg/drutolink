@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { 
   Search, Camera, ShoppingCart, User, Menu, MapPin, Phone, CreditCard, 
-  LayoutDashboard, ShoppingBag, Package, CheckCircle, Plus, Upload, ArrowLeft 
+  LayoutDashboard, ShoppingBag, Package, CheckCircle, Plus, Upload, ArrowLeft, Lock, Key 
 } from 'lucide-react';
 
-// --- ADMIN DASHBOARD COMPONENT ---
+// --- SECURE ADMIN DASHBOARD ---
 function AdminDashboard({ goHome }) {
   const [activeTab, setActiveTab] = useState('orders');
 
@@ -41,6 +41,7 @@ function AdminDashboard({ goHome }) {
           <h2 className="text-xl font-bold text-gray-800 border-b-2 border-violet-500 pb-1">
             {activeTab === 'orders' ? 'Order Management' : 'Product Inventory'}
           </h2>
+          <span className="text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full">Securely Logged In</span>
         </header>
 
         <main className="flex-1 overflow-y-auto p-8">
@@ -102,14 +103,67 @@ function AdminDashboard({ goHome }) {
   );
 }
 
-// --- MAIN STOREFRONT COMPONENT ---
+// --- MAIN STOREFRONT & PASSWORD GATE COMPONENT ---
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
+  
+  // Admin Login States
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState(false);
 
-  // If view is admin, show only the admin dashboard
-  if (currentView === 'admin') {
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    // SET YOUR SECRET PASSWORD HERE (Change 'mahir123' to whatever secret password you want)
+    if (passwordInput === 'mahir123') {
+      setIsAdminLoggedIn(true);
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+    }
+  };
+
+  // If view is admin and they are logged in, show dashboard
+  if (currentView === 'admin' && isAdminLoggedIn) {
     return <AdminDashboard goHome={() => setCurrentView('home')} />;
+  }
+
+  // If view is admin but they are NOT logged in, show Password Lock Screen
+  if (currentView === 'admin' && !isAdminLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+          <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="h-6 w-6" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Admin Portal Restricted</h2>
+          <p className="text-sm text-gray-500 mb-6">Enter your secret master password to access DrutoLink management.</p>
+          
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div className="relative">
+              <Key className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+              <input 
+                type="password" 
+                placeholder="Enter Admin Password" 
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" 
+              />
+            </div>
+            {loginError && <p className="text-red-500 text-xs text-left">Incorrect password. Access denied.</p>}
+            
+            <button type="submit" className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-lg transition-colors">
+              Unlock Dashboard
+            </button>
+          </form>
+
+          <button onClick={() => setCurrentView('home')} className="mt-4 text-sm text-gray-500 hover:text-gray-800 underline">
+            Return to Storefront
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -166,9 +220,8 @@ export default function App() {
       ) : (
         <div className="container mx-auto px-4 py-8 text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Wholesale Products from China</h2>
-          <p className="text-gray-500 mb-8">Click the "Admin" button in the top right to start adding products manually.</p>
+          <p className="text-gray-500 mb-8">Welcome to DrutoLink. High-speed importing made simple.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-             {/* Empty placeholders ready for backend data */}
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 h-64 flex items-center justify-center text-gray-300">
                 <Camera className="h-10 w-10" />
