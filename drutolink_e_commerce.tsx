@@ -3,6 +3,7 @@ import {
   Search, Camera, ShoppingCart, User, Menu, MapPin, Phone, CreditCard, 
   LayoutDashboard, ShoppingBag, Package, CheckCircle, Plus, Upload, ArrowLeft 
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- ADMIN DASHBOARD COMPONENT ---
 function AdminDashboard({ goHome }) {
@@ -109,7 +110,12 @@ export default function App() {
 
   // If view is admin, show only the admin dashboard
   if (currentView === 'admin') {
-    return <AdminDashboard goHome={() => setCurrentView('home')} />;
+    return (
+      <>
+        <AdminDashboard goHome={() => setCurrentView('home')} />
+        <Analytics />
+      </>
+    );
   }
 
   return (
@@ -177,6 +183,7 @@ export default function App() {
           </div>
         </div>
       )}
+      <Analytics />
     </div>
   );
 }
