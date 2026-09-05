@@ -8,12 +8,10 @@ import {
 function AdminDashboard({ goHome, products, setProducts }) {
   const [activeTab, setActiveTab] = useState('orders');
   
-  // New product form state
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
 
-  // Handle image file upload from PC
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -43,7 +41,6 @@ function AdminDashboard({ goHome, products, setProducts }) {
     setProducts(updatedProducts);
     localStorage.setItem('drutolink_products', JSON.stringify(updatedProducts));
 
-    // Reset form
     setTitle('');
     setPrice('');
     setImage('');
@@ -59,7 +56,6 @@ function AdminDashboard({ goHome, products, setProducts }) {
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans w-full">
-      {/* Sidebar */}
       <div className="w-64 bg-[#121212] text-white flex flex-col">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-violet-500 tracking-tight">
@@ -84,7 +80,6 @@ function AdminDashboard({ goHome, products, setProducts }) {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-800 border-b-2 border-violet-500 pb-1">
@@ -134,7 +129,6 @@ function AdminDashboard({ goHome, products, setProducts }) {
 
           {activeTab === 'products' && (
             <div className="space-y-8">
-              {/* Add Product Form */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
                 <h3 className="text-lg font-bold mb-4">Add New Wholesale Product</h3>
                 <form onSubmit={handleAddProduct} className="space-y-4">
@@ -160,7 +154,6 @@ function AdminDashboard({ goHome, products, setProducts }) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Upload Product Image from PC</label>
-                    {/* Fixed direct file input field */}
                     <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                       <input 
                         type="file" 
@@ -185,7 +178,6 @@ function AdminDashboard({ goHome, products, setProducts }) {
                 </form>
               </div>
 
-              {/* Existing Products List in Admin */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h3 className="text-lg font-bold mb-4">Active Catalog ({products.length} Items)</h3>
                 {products.length === 0 ? (
@@ -221,8 +213,8 @@ function AdminDashboard({ goHome, products, setProducts }) {
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
+  const [cartItem, setCartItem] = useState(null);
   
-  // Persistent Products State loaded from LocalStorage
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('drutolink_products');
     if (saved) {
@@ -234,7 +226,6 @@ export default function App() {
     ];
   });
   
-  // Admin Login States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
@@ -247,6 +238,11 @@ export default function App() {
     } else {
       setLoginError(true);
     }
+  };
+
+  const handleBuyNow = (product) => {
+    setCartItem(product);
+    setCurrentView('checkout');
   };
 
   if (currentView === 'admin' && isAdminLoggedIn) {
@@ -291,7 +287,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setCurrentView('home')}>
@@ -314,37 +309,51 @@ export default function App() {
             </div>
             <div onClick={() => setCurrentView('checkout')} className="flex flex-col items-center cursor-pointer text-gray-500 hover:text-violet-600 relative">
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-2 -right-2 bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>
+              <span className="absolute -top-2 -right-2 bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartItem ? 1 : 0}</span>
               <span className="text-xs mt-1 font-medium">Cart</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
       {currentView === 'checkout' ? (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
-          <h2 className="text-2xl font-bold mb-6">Checkout</h2>
+          <button onClick={() => setCurrentView('home')} className="flex items-center text-sm text-gray-600 mb-4 hover:text-violet-600">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Continue Shopping
+          </button>
+          
+          <h2 className="text-2xl font-bold mb-6">Checkout & Local Payment</h2>
+          
+          {cartItem && (
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex items-center space-x-4">
+              <img src={cartItem.image} alt={cartItem.title} className="h-20 w-20 object-cover rounded" />
+              <div>
+                <h3 className="font-bold text-gray-800">{cartItem.title}</h3>
+                <p className="text-violet-600 font-bold mt-1">৳ {cartItem.price}</p>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-            <h3 className="text-lg font-bold mb-4 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-violet-600" /> Payment Method</h3>
+            <h3 className="text-lg font-bold mb-4 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-violet-600" /> Select Payment Method</h3>
             <div className="flex space-x-4 mb-6">
               <button onClick={() => setPaymentMethod('bkash')} className={`flex-1 py-3 border rounded-lg font-bold ${paymentMethod === 'bkash' ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-gray-200'}`}>bKash</button>
               <button onClick={() => setPaymentMethod('nagad')} className={`flex-1 py-3 border rounded-lg font-bold ${paymentMethod === 'nagad' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200'}`}>Nagad</button>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600 mb-2">Please Send Money to our official number:</p>
+              <p className="text-sm text-gray-600 mb-1">Please Send Money via <b>{paymentMethod.toUpperCase()}</b> to:</p>
               <p className="text-xl font-bold text-gray-900 mb-4">+880 1620 177883</p>
-              <input type="text" placeholder="Enter your Account Number" className="w-full border p-2.5 rounded mb-3 outline-none focus:border-violet-500" />
-              <input type="text" placeholder="Enter TrxID (Transaction ID)" className="w-full border p-2.5 rounded outline-none focus:border-violet-500" />
+              <input type="text" placeholder="Your Account Number (e.g., 017xxxxxxxx)" className="w-full border p-2.5 rounded mb-3 outline-none focus:border-violet-500" />
+              <input type="text" placeholder="Enter Transaction ID (TrxID)" className="w-full border p-2.5 rounded outline-none focus:border-violet-500" />
             </div>
           </div>
-          <button className="w-full bg-violet-600 text-white font-bold py-4 rounded-xl hover:bg-violet-700 text-lg">Confirm Wholesale Order</button>
+          <button onClick={() => alert('Order placed successfully! We will verify your TrxID.')} className="w-full bg-violet-600 text-white font-bold py-4 rounded-xl hover:bg-violet-700 text-lg">Confirm Wholesale Order</button>
         </div>
       ) : (
         <div className="container mx-auto px-4 py-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Wholesale Products from China</h2>
-            <p className="text-gray-500">Click the "Admin" button on top to securely log in and upload products.</p>
+            <p className="text-gray-500">Click "Buy Now" on any item to proceed to bKash/Nagad checkout.</p>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -355,7 +364,10 @@ export default function App() {
                   <h3 className="font-semibold text-gray-800 text-sm mb-2">{p.title}</h3>
                   <div className="flex items-center justify-between mt-auto">
                     <span className="text-violet-600 font-bold text-base">৳ {p.price}</span>
-                    <button className="bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors">
+                    <button 
+                      onClick={() => handleBuyNow(p)}
+                      className="bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer"
+                    >
                       Buy Now
                     </button>
                   </div>
