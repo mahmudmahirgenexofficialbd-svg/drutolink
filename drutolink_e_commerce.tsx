@@ -23,9 +23,9 @@ const CATEGORIES = [
 ];
 
 const SLIDES = [
-  { image: '/slides/slide1.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং' },
-  { image: '/slides/slide2.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
-  { image: '/slides/slide3.jpg', alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
+  { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide1.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং' },
+  { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide2.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
+  { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide3.jpg', alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
 ];
 
 // --- IMAGE SLIDER ---
