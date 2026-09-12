@@ -298,7 +298,7 @@ export default function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === 'mahir123') {
+    if (passwordInput === 'mahir@13985') {
       setIsAdminLoggedIn(true);
       setLoginError(false);
     } else {
