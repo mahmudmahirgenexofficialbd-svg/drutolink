@@ -22,11 +22,6 @@ const CATEGORIES = [
   { name: 'মোবাইল এক্সেসরিজ', emoji: '📱' },
 ];
 
-const CATEGORIES = [
-  { name: 'ইলেকট্রনিক্স', emoji: '🔌' },
-  // ... (বাকি ক্যাটাগরিগুলো)
-];
-
 const SLIDES = [
   { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide1.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং' },
   { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide2.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
