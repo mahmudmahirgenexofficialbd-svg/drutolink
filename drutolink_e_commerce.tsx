@@ -30,9 +30,8 @@ const SLIDES = [
 
 // --- IMAGE SLIDER ---
 function ImageSlider() {
-// --- IMAGE SLIDER ---
-function ImageSlider() {
   const [active, setActive] = useState(0);
+```
   const timerRef = useRef(null);
 
   useEffect(() => {
