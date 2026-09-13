@@ -2,17 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
-  CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X
+  CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
+  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import {
-  collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy,
-  serverTimestamp, updateDoc,
+  collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where,
+  serverTimestamp, updateDoc, setDoc, getDoc,
 } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import {
+  onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  createUserWithEmailAndPassword, updateProfile,
+  GoogleAuthProvider, signInWithPopup,
+} from 'firebase/auth';
 
 // এই ইমেইলটা Firebase Console → Authentication → Users এ যে অ্যাডমিন ইউজার বানাবেন, সেটার সাথে হুবহু মিলতে হবে
 const ADMIN_EMAIL = 'admin@drutolink.com';
+
+// অর্ডারের ধাপগুলো — ঠিক এই ক্রমে, AdminDashboard-এর স্ট্যাটাস ড্রপডাউনের সাথে মিলিয়ে
+const ORDER_STAGES = ['Pending TrxID', 'Order Placed', 'Sourced in China', 'Delivered'];
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
@@ -253,6 +261,183 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
             কার্টে যোগ করুন
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// --- ORDER STATUS TIMELINE ---
+function OrderStatusTimeline({ status }) {
+  const currentIndex = Math.max(0, ORDER_STAGES.indexOf(status));
+  return (
+    <div className="flex items-center w-full">
+      {ORDER_STAGES.map((stage, i) => {
+        const done = i < currentIndex;
+        const active = i === currentIndex;
+        return (
+          <React.Fragment key={stage}>
+            <div className="flex flex-col items-center text-center w-20">
+              <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+                done ? 'bg-red-600 border-red-600 text-white'
+                : active ? 'border-red-600 text-red-600 bg-red-50'
+                : 'border-gray-300 text-gray-300 bg-white'
+              }`}>
+                {done ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-3 w-3 fill-current" />}
+              </div>
+              <span className={`mt-1.5 text-[10px] leading-tight ${active ? 'text-red-700 font-bold' : done ? 'text-gray-700' : 'text-gray-400'}`}>
+                {stage}
+              </span>
+            </div>
+            {i < ORDER_STAGES.length - 1 && (
+              <div className={`flex-1 h-0.5 -mt-5 ${i < currentIndex ? 'bg-red-600' : 'bg-gray-200'}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- CUSTOMER LOGIN / SIGN UP ---
+function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, authLoading, goHome }) {
+  const [loginMethod, setLoginMethod] = useState('email'); // 'email' | 'phone'
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  const isSignup = mode === 'signup';
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isSignup) {
+      onSignup({ name, email, phone, password });
+    } else {
+      onLogin({ email, password, rememberMe });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-body flex items-center justify-center px-4 py-10">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="flex items-center gap-2 justify-center mb-1 cursor-pointer" onClick={goHome}>
+          <span className="font-display text-2xl font-extrabold tracking-tight text-red-700">
+            Druto<span className="font-medium text-gray-700">Link</span>
+          </span>
+        </div>
+        <h1 className="text-xl font-bold text-center mt-3">{isSignup ? 'অ্যাকাউন্ট তৈরি করুন' : 'সাইন ইন করুন'}</h1>
+        <p className="text-sm text-gray-500 text-center mt-1">
+          {isSignup ? 'শুরু করতে আপনার তথ্য দিন' : 'ফিরে আসার জন্য ধন্যবাদ! আপনার অ্যাকাউন্টে লগ ইন করুন'}
+        </p>
+
+        <div className="mt-6 space-y-3">
+          <button type="button" onClick={() => onGoogleLogin()} disabled={authLoading}
+            className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+            <svg className="h-4 w-4" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6 29.5 4 24 4c-7.5 0-14 4.2-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-1.8 14.1-5l-6.5-5.5C29.5 35.4 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8l-6.6 5C9.9 39.7 16.4 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.5 5.5C40.8 36.3 44 30.8 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
+            Sign in with Google
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">or</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignup && (
+            <div>
+              <label className="text-sm font-medium text-gray-700">আপনার নাম</label>
+              <input type="text" required value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="পুরো নাম লিখুন"
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+            </div>
+          )}
+
+          {!isSignup && (
+            <div className="flex gap-4 text-sm font-medium border-b border-gray-100">
+              <button type="button" onClick={() => setLoginMethod('email')}
+                className={`pb-2 -mb-px border-b-2 ${loginMethod === 'email' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-400'}`}>
+                Email Address
+              </button>
+              <button type="button" onClick={() => setLoginMethod('phone')}
+                className={`pb-2 -mb-px border-b-2 ${loginMethod === 'phone' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-400'}`}>
+                Phone Number
+              </button>
+            </div>
+          )}
+
+          {(isSignup || loginMethod === 'email') && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Email Address</label>
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+            </div>
+          )}
+
+          {!isSignup && loginMethod === 'phone' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><PhoneIcon className="h-3.5 w-3.5" /> Phone Number</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                placeholder="01xxxxxxxxx"
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+              <p className="text-[11px] text-amber-600 mt-1">ফোন নম্বর দিয়ে লগইন এখনো চালু হয়নি — আপাতত ইমেইল ব্যবহার করুন।</p>
+            </div>
+          )}
+
+          {isSignup && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><PhoneIcon className="h-3.5 w-3.5" /> ফোন নম্বর</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                placeholder="01xxxxxxxxx"
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Password</label>
+            <div className="relative mt-1">
+              <input type={showPassword ? 'text' : 'password'} required minLength={6} value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg p-2.5 pr-10 outline-none focus:border-red-500" />
+              <button type="button" onClick={() => setShowPassword((s) => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          {!isSignup && (
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+                Remember me
+              </label>
+            </div>
+          )}
+
+          {authError && <p className="text-red-600 text-xs">{authError}</p>}
+
+          <button type="submit" disabled={authLoading}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl disabled:opacity-60">
+            {authLoading ? 'অপেক্ষা করুন...' : isSignup ? 'Sign up' : 'Sign in'}
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-gray-500 mt-5">
+          {isSignup ? (
+            <>Already have an account? <button onClick={() => setMode('login')} className="text-red-700 font-semibold">Sign in</button></>
+          ) : (
+            <>New here? <button onClick={() => setMode('signup')} className="text-red-700 font-semibold">Sign up</button></>
+          )}
+        </p>
+
+        <button onClick={goHome} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4">
+          স্টোরে ফিরে যান
+        </button>
       </div>
     </div>
   );
@@ -609,20 +794,38 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // --- ADMIN AUTH (real Firebase Authentication, not a hardcoded password) ---
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  // --- AUTH (single Firebase Authentication instance, shared by admin + customers) ---
+  const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [customerProfile, setCustomerProfile] = useState(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
 
+  // Admin is identified by email match, NOT merely by "someone is logged in" —
+  // otherwise any signed-in customer would also see the admin dashboard.
+  const isAdminLoggedIn = !!authUser && authUser.email === ADMIN_EMAIL;
+  const isCustomerLoggedIn = !!authUser && authUser.email !== ADMIN_EMAIL;
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      setIsAdminLoggedIn(!!user);
+      setAuthUser(user);
       setAuthChecked(true);
     });
     return () => unsub();
   }, []);
+
+  // Load the logged-in customer's profile (name/phone) from Firestore
+  useEffect(() => {
+    if (!authUser || authUser.email === ADMIN_EMAIL) {
+      setCustomerProfile(null);
+      return;
+    }
+    (async () => {
+      const snap = await getDoc(doc(db, 'customers', authUser.uid));
+      setCustomerProfile(snap.exists() ? snap.data() : null);
+    })();
+  }, [authUser]);
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
@@ -635,6 +838,67 @@ export default function App() {
       setLoginError(true);
     } finally {
       setLoggingIn(false);
+    }
+  };
+
+  // --- CUSTOMER AUTH ---
+  const [customerAuthError, setCustomerAuthError] = useState('');
+  const [customerAuthLoading, setCustomerAuthLoading] = useState(false);
+  const [redirectAfterLogin, setRedirectAfterLogin] = useState('home');
+
+  const handleCustomerLogin = async ({ email, password }) => {
+    setCustomerAuthLoading(true);
+    setCustomerAuthError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      setCurrentView(redirectAfterLogin);
+    } catch (err) {
+      setCustomerAuthError('ইমেইল বা পাসওয়ার্ড ভুল। আবার চেষ্টা করুন।');
+    } finally {
+      setCustomerAuthLoading(false);
+    }
+  };
+
+  const handleCustomerSignup = async ({ name, email, phone, password }) => {
+    setCustomerAuthLoading(true);
+    setCustomerAuthError('');
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName: name });
+      await setDoc(doc(db, 'customers', cred.user.uid), {
+        name, email, phone: phone || null, createdAt: serverTimestamp(),
+      });
+      setCurrentView(redirectAfterLogin);
+    } catch (err) {
+      setCustomerAuthError(
+        err.code === 'auth/email-already-in-use'
+          ? 'এই ইমেইল দিয়ে আগে থেকেই অ্যাকাউন্ট আছে। সাইন ইন করুন।'
+          : 'অ্যাকাউন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।'
+      );
+    } finally {
+      setCustomerAuthLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setCustomerAuthLoading(true);
+    setCustomerAuthError('');
+    try {
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      const snap = await getDoc(doc(db, 'customers', result.user.uid));
+      if (!snap.exists()) {
+        await setDoc(doc(db, 'customers', result.user.uid), {
+          name: result.user.displayName || '',
+          email: result.user.email || '',
+          phone: null,
+          createdAt: serverTimestamp(),
+        });
+      }
+      setCurrentView(redirectAfterLogin);
+    } catch (err) {
+      setCustomerAuthError('গুগল লগইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setCustomerAuthLoading(false);
     }
   };
 
@@ -672,6 +936,14 @@ export default function App() {
 
   const handleConfirmOrder = async () => {
     if (cart.length === 0) return;
+
+    // Checkout requires a logged-in customer, so every order can be tied to an account
+    if (!isCustomerLoggedIn) {
+      setRedirectAfterLogin('checkout');
+      setCurrentView('login');
+      return;
+    }
+
     if (!accountNumber || !trxId) {
       alert('অনুগ্রহ করে আপনার একাউন্ট নাম্বার ও ট্রানজেকশন আইডি দিন।');
       return;
@@ -686,6 +958,10 @@ export default function App() {
         trxId,
         status: 'Pending TrxID',
         createdAt: serverTimestamp(),
+        customerId: authUser.uid,
+        customerName: customerProfile?.name || authUser.displayName || '',
+        customerEmail: authUser.email || '',
+        customerPhone: customerProfile?.phone || null,
       });
       alert('অর্ডার সফলভাবে দেওয়া হয়েছে! আমরা আপনার TrxID যাচাই করব।');
       setAccountNumber(''); setTrxId(''); setCart([]);
@@ -741,6 +1017,88 @@ export default function App() {
     );
   }
 
+  if (currentView === 'account') {
+    if (!isCustomerLoggedIn) {
+      return (
+        <AuthPage
+          mode="login"
+          setMode={setCurrentView}
+          onLogin={handleCustomerLogin}
+          onSignup={handleCustomerSignup}
+          onGoogleLogin={handleGoogleLogin}
+          authError={customerAuthError}
+          authLoading={customerAuthLoading}
+          goHome={() => setCurrentView('home')}
+        />
+      );
+    }
+    const myOrders = orders.filter((o) => o.customerId === authUser.uid);
+    return (
+      <div className="min-h-screen bg-gray-50 font-body">
+        <style>{FONTS}</style>
+        <header className="bg-red-700 text-white sticky top-0 z-40">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <button onClick={() => setCurrentView('home')} className="flex items-center gap-2 text-sm">
+              <ArrowLeft className="h-4 w-4" /> স্টোরে ফিরুন
+            </button>
+            <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm bg-red-800 hover:bg-red-900 px-3 py-1.5 rounded-lg">
+              <LogOut className="h-4 w-4" /> লগ-আউট
+            </button>
+          </div>
+        </header>
+
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 flex items-center gap-4">
+            <div className="h-14 w-14 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-xl">
+              {(customerProfile?.name || authUser.email || '?')[0].toUpperCase()}
+            </div>
+            <div>
+              <h2 className="font-bold text-lg">{customerProfile?.name || 'আপনার অ্যাকাউন্ট'}</h2>
+              <p className="text-sm text-gray-500">{authUser.email}</p>
+              {customerProfile?.phone && <p className="text-sm text-gray-500">{customerProfile.phone}</p>}
+            </div>
+          </div>
+
+          <h3 className="font-bold text-lg mb-4">আমার অর্ডার সমূহ</h3>
+          {myOrders.length === 0 ? (
+            <p className="text-gray-500 text-sm">আপনার এখনো কোনো অর্ডার নেই।</p>
+          ) : (
+            <div className="space-y-4">
+              {myOrders.map((o) => (
+                <div key={o.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      {(o.items || []).map((it, idx) => (
+                        <p key={idx} className="text-sm font-semibold">{it.title} × {it.quantity}</p>
+                      ))}
+                    </div>
+                    <span className="font-display text-red-700 font-bold">৳ {o.totalPrice}</span>
+                  </div>
+                  <OrderStatusTimeline status={o.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'login' || currentView === 'signup') {
+    return (
+      <AuthPage
+        mode={currentView}
+        setMode={setCurrentView}
+        onLogin={handleCustomerLogin}
+        onSignup={handleCustomerSignup}
+        onGoogleLogin={handleGoogleLogin}
+        authError={customerAuthError}
+        authLoading={customerAuthLoading}
+        goHome={() => setCurrentView('home')}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white font-body text-gray-900">
       <style>{FONTS}</style>
@@ -762,10 +1120,17 @@ export default function App() {
             </button>
           </form>
           <div className="flex items-center gap-5 text-sm">
-            <div onClick={() => setCurrentView('admin')} className="flex flex-col items-center cursor-pointer">
-              <User className="h-5 w-5" />
-              <span className="text-xs mt-0.5">অ্যাডমিন</span>
-            </div>
+            {isCustomerLoggedIn ? (
+              <div onClick={() => setCurrentView('account')} className="flex flex-col items-center cursor-pointer">
+                <User className="h-5 w-5" />
+                <span className="text-xs mt-0.5">{customerProfile?.name?.split(' ')[0] || 'অ্যাকাউন্ট'}</span>
+              </div>
+            ) : (
+              <div onClick={() => { setRedirectAfterLogin('home'); setCurrentView('login'); }} className="flex flex-col items-center cursor-pointer">
+                <User className="h-5 w-5" />
+                <span className="text-xs mt-0.5">লগ ইন</span>
+              </div>
+            )}
             <div onClick={() => setIsCartOpen(true)} className="flex flex-col items-center cursor-pointer relative">
               <ShoppingCart className="h-5 w-5" />
               <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
@@ -796,7 +1161,20 @@ export default function App() {
           <button onClick={() => setCurrentView('home')} className="flex items-center text-sm text-gray-600 mb-4 hover:text-red-600">
             <ArrowLeft className="h-4 w-4 mr-1" /> কেনাকাটা চালিয়ে যান
           </button>
-          <h2 className="text-2xl font-bold mb-6">চেকআউট ও লোকাল পেমেন্ট</h2>
+          <h2 className="text-2xl font-bold mb-3">চেকআউট ও লোকাল পেমেন্ট</h2>
+
+          {isCustomerLoggedIn ? (
+            <p className="text-sm text-gray-500 mb-6">
+              লগ ইন করা আছে: <span className="font-semibold text-gray-700">{customerProfile?.name || authUser.email}</span>
+            </p>
+          ) : (
+            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-6">
+              <span>অর্ডার নিশ্চিত করতে আগে লগ ইন করতে হবে।</span>
+              <button onClick={() => { setRedirectAfterLogin('checkout'); setCurrentView('login'); }} className="font-bold underline">
+                লগ ইন করুন
+              </button>
+            </div>
+          )}
 
           {cart.length === 0 ? (
             <p className="text-gray-500 text-sm mb-6">আপনার কার্টে কোনো প্রোডাক্ট নেই। আগে একটি প্রোডাক্ট বেছে নিন।</p>
@@ -850,7 +1228,7 @@ export default function App() {
           </div>
           <button onClick={handleConfirmOrder} disabled={cart.length === 0 || orderSubmitting}
             className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg disabled:opacity-60">
-            {orderSubmitting ? 'সাবমিট হচ্ছে...' : 'পাইকারি অর্ডার নিশ্চিত করুন'}
+            {orderSubmitting ? 'সাবমিট হচ্ছে...' : isCustomerLoggedIn ? 'পাইকারি অর্ডার নিশ্চিত করুন' : 'লগ ইন করে অর্ডার নিশ্চিত করুন'}
           </button>
         </div>
       ) : (
@@ -990,6 +1368,9 @@ export default function App() {
                 Druto<span className="font-medium text-red-100">Link</span>
               </span>
               <span>© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
+              <button onClick={() => setCurrentView('admin')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto">
+                অ্যাডমিন প্যানেল
+              </button>
             </div>
           </footer>
         </>
