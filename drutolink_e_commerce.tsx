@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
-  CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut
+  CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X
 } from 'lucide-react';
 import { db, auth } from './firebase';
 import {
@@ -98,6 +98,81 @@ function RouteGraphic() {
         </foreignObject>
       </g>
     </svg>
+  );
+}
+
+// --- SIDE CART DRAWER (opens on Add to Cart, and from the header cart icon) ---
+function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTotal, onCheckout }) {
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className={`fixed inset-0 bg-black/40 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      />
+      {/* Slide-in panel */}
+      <div
+        role="dialog"
+        aria-label="কার্ট"
+        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col font-body transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
+          <h3 className="font-display text-lg font-bold text-gray-900 flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-red-600" /> আপনার কার্ট ({cartCount})
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+          {cart.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 text-sm">
+              আপনার কার্ট খালি। প্রোডাক্ট বেছে "কার্টে যোগ করুন" চাপুন।
+            </div>
+          ) : (
+            cart.map((item) => (
+              <div key={item.id} className="p-4 flex items-center gap-3">
+                <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded-lg border border-gray-100 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-semibold text-gray-800 truncate">{item.title}</h4>
+                  <p className="text-red-600 font-bold text-sm mt-0.5">৳ {item.price}</p>
+                  <div className="flex items-center border rounded-lg mt-2 w-fit">
+                    <button onClick={() => onUpdateQuantity(item.id, -1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="px-3 text-xs font-semibold">{item.quantity}</span>
+                    <button onClick={() => onUpdateQuantity(item.id, 1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+                <button onClick={() => onRemove(item.id)} className="text-gray-400 hover:text-red-600 p-1 shrink-0">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {cart.length > 0 && (
+          <div className="border-t border-gray-200 p-5 space-y-3 shrink-0">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-gray-700">সর্বমোট</span>
+              <span className="font-display text-red-700 font-bold text-lg">৳ {cartTotal}</span>
+            </div>
+            <button onClick={onCheckout} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors">
+              চেকআউটে যান
+            </button>
+            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-800 py-1">
+              কেনাকাটা চালিয়ে যান
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -326,6 +401,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [cart, setCart] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [accountNumber, setAccountNumber] = useState('');
@@ -399,6 +475,7 @@ export default function App() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
+    setIsCartOpen(true);
   };
 
   const handleUpdateQuantity = (id, delta) => {
@@ -510,7 +587,7 @@ export default function App() {
               <User className="h-5 w-5" />
               <span className="text-xs mt-0.5">অ্যাডমিন</span>
             </div>
-            <div onClick={() => setCurrentView('checkout')} className="flex flex-col items-center cursor-pointer relative">
+            <div onClick={() => setIsCartOpen(true)} className="flex flex-col items-center cursor-pointer relative">
               <ShoppingCart className="h-5 w-5" />
               <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
               <span className="text-xs mt-0.5">কার্ট</span>
@@ -518,6 +595,16 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemove={handleRemoveFromCart}
+        cartTotal={cartTotal}
+        onCheckout={() => { setIsCartOpen(false); setCurrentView('checkout'); }}
+      />
 
       {currentView === 'checkout' ? (
         <div className="max-w-4xl mx-auto px-4 py-8">
