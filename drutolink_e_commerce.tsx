@@ -4,6 +4,11 @@ import {
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2
 } from 'lucide-react';
+import { db } from './firebase';
+import {
+  collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy,
+  serverTimestamp, updateDoc,
+} from 'firebase/firestore';
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
@@ -93,11 +98,13 @@ function RouteGraphic() {
 }
 
 // --- SECURE ADMIN DASHBOARD ---
-function AdminDashboard({ goHome, products, setProducts }) {
+function AdminDashboard({ goHome, products, orders }) {
   const [activeTab, setActiveTab] = useState('orders');
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
+  const [category, setCategory] = useState(CATEGORIES[0].name);
+  const [saving, setSaving] = useState(false);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -108,30 +115,37 @@ function AdminDashboard({ goHome, products, setProducts }) {
     }
   };
 
-  const handleAddProduct = (e) => {
+  const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!title || !price) {
       alert('প্রোডাক্টের নাম ও দাম দিন।');
       return;
     }
-    const newProduct = {
-      id: Date.now(),
-      title,
-      price,
-      image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
-    };
-    const updated = [newProduct, ...products];
-    setProducts(updated);
-    localStorage.setItem('drutolink_products', JSON.stringify(updated));
-    setTitle(''); setPrice(''); setImage('');
-    alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
-    setActiveTab('orders');
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'products'), {
+        title,
+        price,
+        category,
+        image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+        createdAt: serverTimestamp(),
+      });
+      setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+      alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
+      setActiveTab('orders');
+    } catch (err) {
+      alert('প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteProduct = (id) => {
-    const updated = products.filter((p) => p.id !== id);
-    setProducts(updated);
-    localStorage.setItem('drutolink_products', JSON.stringify(updated));
+  const handleDeleteProduct = async (id) => {
+    await deleteDoc(doc(db, 'products', id));
+  };
+
+  const handleUpdateStatus = async (orderId, status) => {
+    await updateDoc(doc(db, 'orders', orderId), { status });
   };
 
   return (
@@ -145,7 +159,7 @@ function AdminDashboard({ goHome, products, setProducts }) {
         <nav className="flex-1 px-4 space-y-2">
           <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
             <ShoppingBag className="h-5 w-5" />
-            <span>অর্ডার ও TrxID</span>
+            <span>অর্ডার ও TrxID ({orders.length})</span>
           </button>
           <button onClick={() => setActiveTab('products')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
             <Package className="h-5 w-5" />
@@ -172,38 +186,53 @@ function AdminDashboard({ goHome, products, setProducts }) {
           {activeTab === 'orders' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-bold mb-4">সাম্প্রতিক অর্ডার (ম্যানুয়াল যাচাই)</h3>
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
-                    <th className="p-4 font-medium">অর্ডার আইডি</th>
-                    <th className="p-4 font-medium">পেমেন্ট (TrxID)</th>
-                    <th className="p-4 font-medium">স্ট্যাটাস</th>
-                    <th className="p-4 font-medium">অ্যাকশন</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-4 font-mono text-sm">#DL-8842</td>
-                    <td className="p-4">
-                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-pink-100 text-pink-700 mb-1">bKash</span>
-                      <p className="font-mono text-sm">8J2A9XXQ1</p>
-                    </td>
-                    <td className="p-4">
-                      <select className="bg-gray-50 border border-gray-200 text-sm rounded p-2">
-                        <option>Pending TrxID</option>
-                        <option>Order Placed</option>
-                        <option>Sourced in China</option>
-                      </select>
-                    </td>
-                    <td className="p-4">
-                      <button className="flex items-center space-x-1 text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded text-sm">
-                        <CheckCircle className="h-4 w-4" />
-                        <span>Approve</span>
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              {orders.length === 0 ? (
+                <p className="text-gray-500 text-sm">এখনো কোনো অর্ডার আসেনি।</p>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
+                      <th className="p-4 font-medium">প্রোডাক্ট</th>
+                      <th className="p-4 font-medium">পেমেন্ট (TrxID)</th>
+                      <th className="p-4 font-medium">স্ট্যাটাস</th>
+                      <th className="p-4 font-medium">অ্যাকশন</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o) => (
+                      <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="p-4 text-sm">
+                          <p className="font-semibold">{o.productTitle}</p>
+                          <p className="text-xs text-gray-500">৳ {o.productPrice}</p>
+                        </td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold mb-1 ${o.paymentMethod === 'bkash' ? 'bg-pink-100 text-pink-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {o.paymentMethod === 'bkash' ? 'bKash' : 'Nagad'}
+                          </span>
+                          <p className="font-mono text-sm">{o.trxId}</p>
+                          <p className="text-[11px] text-gray-500">A/C: {o.accountNumber}</p>
+                        </td>
+                        <td className="p-4">
+                          <select value={o.status} onChange={(e) => handleUpdateStatus(o.id, e.target.value)}
+                            className="bg-gray-50 border border-gray-200 text-sm rounded p-2">
+                            <option>Pending TrxID</option>
+                            <option>Order Placed</option>
+                            <option>Sourced in China</option>
+                            <option>Delivered</option>
+                          </select>
+                        </td>
+                        <td className="p-4">
+                          <button onClick={() => handleUpdateStatus(o.id, 'Order Placed')}
+                            className="flex items-center space-x-1 text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded text-sm">
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Approve</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
@@ -216,6 +245,13 @@ function AdminDashboard({ goHome, products, setProducts }) {
                     <label className="block text-sm font-medium text-gray-700 mb-1">প্রোডাক্টের নাম</label>
                     <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                       className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="যেমনঃ পুতিয়ান স্পোর্টস জুতা" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ক্যাটাগরি</label>
+                    <select value={category} onChange={(e) => setCategory(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 bg-white">
+                      {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
@@ -238,8 +274,8 @@ function AdminDashboard({ goHome, products, setProducts }) {
                       </div>
                     )}
                   </div>
-                  <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors">
-                    সেভ করুন ও পাবলিশ করুন
+                  <button type="submit" disabled={saving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
+                    {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন ও পাবলিশ করুন'}
                   </button>
                 </form>
               </div>
@@ -280,17 +316,35 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [cartItem, setCartItem] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [accountNumber, setAccountNumber] = useState('');
+  const [trxId, setTrxId] = useState('');
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
 
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('drutolink_products');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return []; }
-    }
-    return [
-      { id: 1, title: 'Putian Shox স্পোর্টস জুতা', price: '2760', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=60' },
-      { id: 2, title: 'মাল্টি-কম্পার্টমেন্ট ক্রসবডি ব্যাগ', price: '4148', image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=500&auto=format&fit=crop&q=60' },
-    ];
-  });
+  const productsRef = useRef(null);
+  const howItWorksRef = useRef(null);
+
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+
+  // Real-time product feed from Firestore — visible to every visitor, not just this browser
+  useEffect(() => {
+    const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  // Real-time order feed for the admin dashboard
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
 
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -298,7 +352,7 @@ export default function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === 'mahir@13985') {
+    if (passwordInput === 'mahir123') {
       setIsAdminLoggedIn(true);
       setLoginError(false);
     } else {
@@ -311,8 +365,42 @@ export default function App() {
     setCurrentView('checkout');
   };
 
+  const handleConfirmOrder = async () => {
+    if (!cartItem) return;
+    if (!accountNumber || !trxId) {
+      alert('অনুগ্রহ করে আপনার একাউন্ট নাম্বার ও ট্রানজেকশন আইডি দিন।');
+      return;
+    }
+    setOrderSubmitting(true);
+    try {
+      await addDoc(collection(db, 'orders'), {
+        productTitle: cartItem.title,
+        productPrice: cartItem.price,
+        paymentMethod,
+        accountNumber,
+        trxId,
+        status: 'Pending TrxID',
+        createdAt: serverTimestamp(),
+      });
+      alert('অর্ডার সফলভাবে দেওয়া হয়েছে! আমরা আপনার TrxID যাচাই করব।');
+      setAccountNumber(''); setTrxId(''); setCartItem(null);
+      setCurrentView('home');
+    } catch (err) {
+      alert('দুঃখিত, অর্ডার সাবমিট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setOrderSubmitting(false);
+    }
+  };
+
+  const scrollToProducts = () => productsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToHowItWorks = () => howItWorksRef.current?.scrollIntoView({ behavior: 'smooth' });
+
+  const visibleProducts = products
+    .filter((p) => !selectedCategory || p.category === selectedCategory)
+    .filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+
   if (currentView === 'admin' && isAdminLoggedIn) {
-    return <AdminDashboard goHome={() => setCurrentView('home')} products={products} setProducts={setProducts} />;
+    return <AdminDashboard goHome={() => setCurrentView('home')} products={products} orders={orders} />;
   }
 
   if (currentView === 'admin' && !isAdminLoggedIn) {
@@ -357,12 +445,13 @@ export default function App() {
               Druto<span className="font-medium text-red-100">Link</span>
             </span>
           </div>
-          <div className="hidden md:flex flex-1 max-w-xl relative">
-            <input type="text" placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2 pl-4 pr-11 text-gray-900 bg-white outline-none" />
-            <button className="absolute right-1.5 top-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full">
+          <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="hidden md:flex flex-1 max-w-xl relative">
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2 pl-4 pr-11 text-gray-900 bg-white outline-none" />
+            <button type="submit" className="absolute right-1.5 top-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full">
               <Search className="h-4 w-4" />
             </button>
-          </div>
+          </form>
           <div className="flex items-center gap-5 text-sm">
             <div onClick={() => setCurrentView('admin')} className="flex flex-col items-center cursor-pointer">
               <User className="h-5 w-5" />
@@ -383,7 +472,7 @@ export default function App() {
             <ArrowLeft className="h-4 w-4 mr-1" /> কেনাকাটা চালিয়ে যান
           </button>
           <h2 className="text-2xl font-bold mb-6">চেকআউট ও লোকাল পেমেন্ট</h2>
-          {cartItem && (
+          {cartItem ? (
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex items-center space-x-4">
               <img src={cartItem.image} alt={cartItem.title} className="h-20 w-20 object-cover rounded" />
               <div>
@@ -391,6 +480,8 @@ export default function App() {
                 <p className="text-red-600 font-bold mt-1">৳ {cartItem.price}</p>
               </div>
             </div>
+          ) : (
+            <p className="text-gray-500 text-sm mb-6">আপনার কার্টে কোনো প্রোডাক্ট নেই। আগে একটি প্রোডাক্ট বেছে নিন।</p>
           )}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
             <h3 className="text-lg font-bold mb-4 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-red-600" /> পেমেন্ট মাধ্যম বেছে নিন</h3>
@@ -401,12 +492,15 @@ export default function App() {
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <p className="text-sm text-gray-600 mb-1">অনুগ্রহ করে <b>{paymentMethod.toUpperCase()}</b>-এ টাকা পাঠান:</p>
               <p className="text-xl font-bold text-gray-900 mb-4">+880 1620 177883</p>
-              <input type="text" placeholder="আপনার একাউন্ট নাম্বার (যেমনঃ 017xxxxxxxx)" className="w-full border p-2.5 rounded mb-3 outline-none focus:border-red-500" />
-              <input type="text" placeholder="ট্রানজেকশন আইডি (TrxID) লিখুন" className="w-full border p-2.5 rounded outline-none focus:border-red-500" />
+              <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="আপনার একাউন্ট নাম্বার (যেমনঃ 017xxxxxxxx)" className="w-full border p-2.5 rounded mb-3 outline-none focus:border-red-500" />
+              <input type="text" value={trxId} onChange={(e) => setTrxId(e.target.value)}
+                placeholder="ট্রানজেকশন আইডি (TrxID) লিখুন" className="w-full border p-2.5 rounded outline-none focus:border-red-500" />
             </div>
           </div>
-          <button onClick={() => alert('অর্ডার সফলভাবে দেওয়া হয়েছে! আমরা আপনার TrxID যাচাই করব।')} className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg">
-            পাইকারি অর্ডার নিশ্চিত করুন
+          <button onClick={handleConfirmOrder} disabled={!cartItem || orderSubmitting}
+            className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg disabled:opacity-60">
+            {orderSubmitting ? 'সাবমিট হচ্ছে...' : 'পাইকারি অর্ডার নিশ্চিত করুন'}
           </button>
         </div>
       ) : (
@@ -429,10 +523,10 @@ export default function App() {
                   হাজারো ভেরিফায়েড চীনা সাপ্লায়ারের প্রোডাক্ট সরাসরি অর্ডার করুন, বিকাশ বা নগদে পেমেন্ট করুন — আমরা সোর্স করে আপনার ঠিকানায় পৌঁছে দেব।
                 </p>
                 <div className="mt-6 flex gap-3">
-                  <button className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg">
+                  <button onClick={scrollToProducts} className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg">
                     প্রোডাক্ট দেখুন
                   </button>
-                  <button className="border border-gray-300 hover:border-gray-400 text-gray-700 font-semibold px-6 py-3 rounded-lg">
+                  <button onClick={scrollToHowItWorks} className="border border-gray-300 hover:border-gray-400 text-gray-700 font-semibold px-6 py-3 rounded-lg">
                     কীভাবে অর্ডার করব?
                   </button>
                 </div>
@@ -455,10 +549,16 @@ export default function App() {
 
           {/* Categories */}
           <section className="max-w-6xl mx-auto px-4 py-10">
-            <h2 className="font-display text-xl font-bold text-gray-900 mb-4">ক্যাটাগরি ঘুরে দেখুন</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-xl font-bold text-gray-900">ক্যাটাগরি ঘুরে দেখুন</h2>
+              {selectedCategory && (
+                <button onClick={() => setSelectedCategory(null)} className="text-xs text-red-600 hover:underline">সব দেখুন ✕</button>
+              )}
+            </div>
             <div className="flex gap-3 overflow-x-auto pb-2">
               {CATEGORIES.map((c) => (
-                <button key={c.name} className="shrink-0 flex flex-col items-center gap-2 bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-300 rounded-xl px-5 py-4 min-w-[110px] transition-colors">
+                <button key={c.name} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); scrollToProducts(); }}
+                  className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-colors ${selectedCategory === c.name ? 'bg-red-50 border-red-400' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300'}`}>
                   <span className="text-2xl">{c.emoji}</span>
                   <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
                 </button>
@@ -467,7 +567,7 @@ export default function App() {
           </section>
 
           {/* How it works */}
-          <section className="bg-red-700 text-white">
+          <section ref={howItWorksRef} className="bg-red-700 text-white">
             <div className="max-w-6xl mx-auto px-4 py-12">
               <h2 className="font-display text-xl font-bold mb-8">মাত্র ৩ ধাপে অর্ডার করুন</h2>
               <div className="grid md:grid-cols-3 gap-8">
@@ -489,26 +589,32 @@ export default function App() {
           </section>
 
           {/* Product grid */}
-          <section className="max-w-6xl mx-auto px-4 py-12">
+          <section ref={productsRef} className="max-w-6xl mx-auto px-4 py-12">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-xl font-bold text-gray-900">জনপ্রিয় পণ্য</h2>
+              <h2 className="font-display text-xl font-bold text-gray-900">
+                {selectedCategory ? selectedCategory : 'জনপ্রিয় পণ্য'}
+              </h2>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {products.map((p) => (
-                <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                  <img src={p.image} alt={p.title} className="h-40 w-full object-cover" />
-                  <div className="p-3 flex flex-col flex-1">
-                    <h3 className="text-sm font-semibold text-gray-800 leading-snug">{p.title}</h3>
-                    <div className="mt-auto pt-3 flex items-center justify-between">
-                      <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
-                      <button onClick={() => handleBuyNow(p)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
-                        কিনুন
-                      </button>
+            {visibleProducts.length === 0 ? (
+              <p className="text-gray-500 text-sm">কোনো প্রোডাক্ট পাওয়া যায়নি। {products.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                {visibleProducts.map((p) => (
+                  <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                    <img src={p.image} alt={p.title} className="h-40 w-full object-cover" />
+                    <div className="p-3 flex flex-col flex-1">
+                      <h3 className="text-sm font-semibold text-gray-800 leading-snug">{p.title}</h3>
+                      <div className="mt-auto pt-3 flex items-center justify-between">
+                        <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
+                        <button onClick={() => handleBuyNow(p)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                          কিনুন
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Footer */}
