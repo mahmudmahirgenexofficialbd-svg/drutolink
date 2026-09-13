@@ -2,13 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
-  CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2
+  CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut
 } from 'lucide-react';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy,
   serverTimestamp, updateDoc,
 } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+
+// এই ইমেইলটা Firebase Console → Authentication → Users এ যে অ্যাডমিন ইউজার বানাবেন, সেটার সাথে হুবহু মিলতে হবে
+const ADMIN_EMAIL = 'admin@drutolink.com';
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
@@ -98,7 +102,7 @@ function RouteGraphic() {
 }
 
 // --- SECURE ADMIN DASHBOARD ---
-function AdminDashboard({ goHome, products, orders }) {
+function AdminDashboard({ goHome, handleLogout, products, orders }) {
   const [activeTab, setActiveTab] = useState('orders');
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -166,10 +170,14 @@ function AdminDashboard({ goHome, products, orders }) {
             <span>প্রোডাক্ট ({products.length})</span>
           </button>
         </nav>
-        <div className="p-4 border-t border-red-600">
+        <div className="p-4 border-t border-red-600 space-y-2">
           <button onClick={goHome} className="w-full flex items-center justify-center space-x-2 bg-red-800 hover:bg-red-900 text-white px-4 py-2 rounded-lg transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span>স্টোরে ফিরুন</span>
+          </button>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition-colors">
+            <LogOut className="h-4 w-4" />
+            <span>লগ-আউট</span>
           </button>
         </div>
       </div>
@@ -200,10 +208,12 @@ function AdminDashboard({ goHome, products, orders }) {
                   </thead>
                   <tbody>
                     {orders.map((o) => (
-                      <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
                         <td className="p-4 text-sm">
-                          <p className="font-semibold">{o.productTitle}</p>
-                          <p className="text-xs text-gray-500">৳ {o.productPrice}</p>
+                          {(o.items || []).map((it, idx) => (
+                            <p key={idx} className="font-semibold">{it.title} × {it.quantity} <span className="text-gray-500 font-normal">(৳ {it.price})</span></p>
+                          ))}
+                          <p className="text-xs text-red-600 font-bold mt-1">মোট ৳ {o.totalPrice}</p>
                         </td>
                         <td className="p-4">
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold mb-1 ${o.paymentMethod === 'bkash' ? 'bg-pink-100 text-pink-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -315,7 +325,7 @@ function AdminDashboard({ goHome, products, orders }) {
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
-  const [cartItem, setCartItem] = useState(null);
+  const [cart, setCart] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [accountNumber, setAccountNumber] = useState('');
@@ -346,27 +356,66 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // --- ADMIN AUTH (real Firebase Authentication, not a hardcoded password) ---
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
 
-  const handleAdminLogin = (e) => {
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setIsAdminLoggedIn(!!user);
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
-    if (passwordInput === 'mahir@13985') {
-      setIsAdminLoggedIn(true);
-      setLoginError(false);
-    } else {
+    setLoggingIn(true);
+    setLoginError(false);
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, passwordInput);
+      setPasswordInput('');
+    } catch (err) {
       setLoginError(true);
+    } finally {
+      setLoggingIn(false);
     }
   };
 
-  const handleBuyNow = (product) => {
-    setCartItem(product);
-    setCurrentView('checkout');
+  const handleLogout = async () => {
+    await signOut(auth);
+    setCurrentView('home');
   };
 
+  // --- MULTI-ITEM CART ---
+  const handleAddToCart = (product) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.id === product.id);
+      if (existing) {
+        return prev.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+  };
+
+  const handleUpdateQuantity = (id, delta) => {
+    setCart((prev) => prev
+      .map((item) => item.id === id ? { ...item, quantity: item.quantity + delta } : item)
+      .filter((item) => item.quantity > 0));
+  };
+
+  const handleRemoveFromCart = (id) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+
   const handleConfirmOrder = async () => {
-    if (!cartItem) return;
+    if (cart.length === 0) return;
     if (!accountNumber || !trxId) {
       alert('অনুগ্রহ করে আপনার একাউন্ট নাম্বার ও ট্রানজেকশন আইডি দিন।');
       return;
@@ -374,8 +423,8 @@ export default function App() {
     setOrderSubmitting(true);
     try {
       await addDoc(collection(db, 'orders'), {
-        productTitle: cartItem.title,
-        productPrice: cartItem.price,
+        items: cart.map((item) => ({ title: item.title, price: item.price, quantity: item.quantity, image: item.image })),
+        totalPrice: cartTotal,
         paymentMethod,
         accountNumber,
         trxId,
@@ -383,7 +432,7 @@ export default function App() {
         createdAt: serverTimestamp(),
       });
       alert('অর্ডার সফলভাবে দেওয়া হয়েছে! আমরা আপনার TrxID যাচাই করব।');
-      setAccountNumber(''); setTrxId(''); setCartItem(null);
+      setAccountNumber(''); setTrxId(''); setCart([]);
       setCurrentView('home');
     } catch (err) {
       alert('দুঃখিত, অর্ডার সাবমিট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
@@ -399,8 +448,12 @@ export default function App() {
     .filter((p) => !selectedCategory || p.category === selectedCategory)
     .filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  if (!authChecked && currentView === 'admin') {
+    return <div className="min-h-screen flex items-center justify-center text-gray-500 font-body">লোড হচ্ছে...</div>;
+  }
+
   if (currentView === 'admin' && isAdminLoggedIn) {
-    return <AdminDashboard goHome={() => setCurrentView('home')} products={products} orders={orders} />;
+    return <AdminDashboard goHome={() => setCurrentView('home')} handleLogout={handleLogout} products={products} orders={orders} />;
   }
 
   if (currentView === 'admin' && !isAdminLoggedIn) {
@@ -420,8 +473,8 @@ export default function App() {
                 className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
             </div>
             {loginError && <p className="text-red-500 text-xs text-left">ভুল পাসওয়ার্ড। প্রবেশ করা যায়নি।</p>}
-            <button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors">
-              আনলক করুন
+            <button type="submit" disabled={loggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-60">
+              {loggingIn ? 'যাচাই হচ্ছে...' : 'আনলক করুন'}
             </button>
           </form>
           <button onClick={() => setCurrentView('home')} className="mt-4 text-sm text-gray-500 hover:text-gray-800 underline">
@@ -459,7 +512,7 @@ export default function App() {
             </div>
             <div onClick={() => setCurrentView('checkout')} className="flex flex-col items-center cursor-pointer relative">
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartItem ? 1 : 0}</span>
+              <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
               <span className="text-xs mt-0.5">কার্ট</span>
             </div>
           </div>
@@ -472,17 +525,35 @@ export default function App() {
             <ArrowLeft className="h-4 w-4 mr-1" /> কেনাকাটা চালিয়ে যান
           </button>
           <h2 className="text-2xl font-bold mb-6">চেকআউট ও লোকাল পেমেন্ট</h2>
-          {cartItem ? (
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex items-center space-x-4">
-              <img src={cartItem.image} alt={cartItem.title} className="h-20 w-20 object-cover rounded" />
-              <div>
-                <h3 className="font-bold text-gray-800">{cartItem.title}</h3>
-                <p className="text-red-600 font-bold mt-1">৳ {cartItem.price}</p>
+
+          {cart.length === 0 ? (
+            <p className="text-gray-500 text-sm mb-6">আপনার কার্টে কোনো প্রোডাক্ট নেই। আগে একটি প্রোডাক্ট বেছে নিন।</p>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 divide-y divide-gray-100">
+              {cart.map((item) => (
+                <div key={item.id} className="p-4 flex items-center space-x-4">
+                  <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-800 text-sm">{item.title}</h3>
+                    <p className="text-red-600 font-bold text-sm mt-1">৳ {item.price}</p>
+                  </div>
+                  <div className="flex items-center border rounded-lg">
+                    <button onClick={() => handleUpdateQuantity(item.id, -1)} className="p-2 text-gray-600 hover:bg-gray-50"><Minus className="h-3.5 w-3.5" /></button>
+                    <span className="px-3 text-sm font-semibold">{item.quantity}</span>
+                    <button onClick={() => handleUpdateQuantity(item.id, 1)} className="p-2 text-gray-600 hover:bg-gray-50"><Plus className="h-3.5 w-3.5" /></button>
+                  </div>
+                  <button onClick={() => handleRemoveFromCart(item.id)} className="text-gray-400 hover:text-red-600 p-1">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              <div className="p-4 flex items-center justify-between bg-gray-50">
+                <span className="font-bold text-gray-700">সর্বমোট</span>
+                <span className="font-display text-red-700 font-bold text-lg">৳ {cartTotal}</span>
               </div>
             </div>
-          ) : (
-            <p className="text-gray-500 text-sm mb-6">আপনার কার্টে কোনো প্রোডাক্ট নেই। আগে একটি প্রোডাক্ট বেছে নিন।</p>
           )}
+
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
             <h3 className="text-lg font-bold mb-4 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-red-600" /> পেমেন্ট মাধ্যম বেছে নিন</h3>
             <div className="flex space-x-4 mb-6">
@@ -498,7 +569,7 @@ export default function App() {
                 placeholder="ট্রানজেকশন আইডি (TrxID) লিখুন" className="w-full border p-2.5 rounded outline-none focus:border-red-500" />
             </div>
           </div>
-          <button onClick={handleConfirmOrder} disabled={!cartItem || orderSubmitting}
+          <button onClick={handleConfirmOrder} disabled={cart.length === 0 || orderSubmitting}
             className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg disabled:opacity-60">
             {orderSubmitting ? 'সাবমিট হচ্ছে...' : 'পাইকারি অর্ডার নিশ্চিত করুন'}
           </button>
@@ -606,8 +677,8 @@ export default function App() {
                       <h3 className="text-sm font-semibold text-gray-800 leading-snug">{p.title}</h3>
                       <div className="mt-auto pt-3 flex items-center justify-between">
                         <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
-                        <button onClick={() => handleBuyNow(p)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
-                          কিনুন
+                        <button onClick={() => handleAddToCart(p)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                          কার্টে যোগ করুন
                         </button>
                       </div>
                     </div>
