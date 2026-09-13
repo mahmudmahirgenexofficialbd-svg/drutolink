@@ -134,22 +134,29 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
             </div>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="p-4 flex items-center gap-3">
+              <div key={item.cartLineId} className="p-4 flex items-center gap-3">
                 <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded-lg border border-gray-100 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-semibold text-gray-800 truncate">{item.title}</h4>
+                  {(item.selectedSize || item.selectedColor) && (
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {item.selectedSize && `সাইজ: ${item.selectedSize}`}
+                      {item.selectedSize && item.selectedColor && ' · '}
+                      {item.selectedColor && `কালার: ${item.selectedColor}`}
+                    </p>
+                  )}
                   <p className="text-red-600 font-bold text-sm mt-0.5">৳ {item.price}</p>
                   <div className="flex items-center border rounded-lg mt-2 w-fit">
-                    <button onClick={() => onUpdateQuantity(item.id, -1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
+                    <button onClick={() => onUpdateQuantity(item.cartLineId, -1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
                       <Minus className="h-3 w-3" />
                     </button>
                     <span className="px-3 text-xs font-semibold">{item.quantity}</span>
-                    <button onClick={() => onUpdateQuantity(item.id, 1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
+                    <button onClick={() => onUpdateQuantity(item.cartLineId, 1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
                       <Plus className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
-                <button onClick={() => onRemove(item.id)} className="text-gray-400 hover:text-red-600 p-1 shrink-0">
+                <button onClick={() => onRemove(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1 shrink-0">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -176,6 +183,81 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
   );
 }
 
+// --- PRODUCT DETAIL MODAL (size / color selection) ---
+function ProductDetailModal({ product, onClose, onAddToCart }) {
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+
+  useEffect(() => {
+    setSelectedSize(product?.sizes?.[0] || '');
+    setSelectedColor(product?.colors?.[0]?.name || '');
+  }, [product]);
+
+  if (!product) return null;
+
+  const hasSizes = product.sizes && product.sizes.length > 0;
+  const hasColors = product.colors && product.colors.length > 0;
+
+  const handleAdd = () => {
+    onAddToCart(product, {
+      selectedSize: hasSizes ? selectedSize : undefined,
+      selectedColor: hasColors ? selectedColor : undefined,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-body">
+      <div onClick={onClose} className="absolute inset-0 bg-black/50" />
+      <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <button onClick={onClose} className="absolute top-3 right-3 bg-white/90 hover:bg-white rounded-full p-1.5 shadow z-10">
+          <X className="h-5 w-5 text-gray-700" />
+        </button>
+        <img src={product.image} alt={product.title} className="w-full h-56 object-cover rounded-t-2xl" />
+        <div className="p-5">
+          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{product.category}</span>
+          <h3 className="font-display text-xl font-bold text-gray-900 mt-2">{product.title}</h3>
+          <p className="text-red-600 font-bold text-lg mt-1">৳ {product.price}</p>
+
+          {hasSizes && (
+            <div className="mt-4">
+              <p className="text-sm font-semibold text-gray-700 mb-2">সাইজ বাছাই করুন</p>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.map((s) => (
+                  <button key={s} onClick={() => setSelectedSize(s)}
+                    className={`px-3.5 py-1.5 rounded-lg border text-sm font-semibold ${selectedSize === s ? 'border-red-600 bg-red-50 text-red-700' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasColors && (
+            <div className="mt-4">
+              <p className="text-sm font-semibold text-gray-700 mb-2">কালার বাছাই করুন</p>
+              <div className="flex flex-wrap gap-2">
+                {product.colors.map((c) => (
+                  <button key={c.name} onClick={() => setSelectedColor(c.name)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
+                    <span className="h-4 w-4 rounded-full border border-gray-300" style={{ backgroundColor: c.hex || '#ccc' }} />
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button onClick={handleAdd}
+            className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors">
+            কার্টে যোগ করুন
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- SECURE ADMIN DASHBOARD ---
 function AdminDashboard({ goHome, handleLogout, products, orders }) {
   const [activeTab, setActiveTab] = useState('orders');
@@ -184,6 +266,33 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
+
+  // --- Size / color variants ---
+  const [sizeInput, setSizeInput] = useState('');
+  const [sizes, setSizes] = useState([]);
+  const [colorNameInput, setColorNameInput] = useState('');
+  const [colorHexInput, setColorHexInput] = useState('#dc2626');
+  const [colors, setColors] = useState([]);
+
+  const handleAddSize = () => {
+    const val = sizeInput.trim();
+    if (!val) return;
+    if (sizes.includes(val)) { setSizeInput(''); return; }
+    setSizes((prev) => [...prev, val]);
+    setSizeInput('');
+  };
+
+  const handleRemoveSize = (val) => setSizes((prev) => prev.filter((s) => s !== val));
+
+  const handleAddColor = () => {
+    const name = colorNameInput.trim();
+    if (!name) return;
+    if (colors.some((c) => c.name === name)) { setColorNameInput(''); return; }
+    setColors((prev) => [...prev, { name, hex: colorHexInput }]);
+    setColorNameInput('');
+  };
+
+  const handleRemoveColor = (name) => setColors((prev) => prev.filter((c) => c.name !== name));
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -207,9 +316,12 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
         price,
         category,
         image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+        sizes,
+        colors,
         createdAt: serverTimestamp(),
       });
       setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+      setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
       setActiveTab('orders');
     } catch (err) {
@@ -286,7 +398,16 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
                       <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
                         <td className="p-4 text-sm">
                           {(o.items || []).map((it, idx) => (
-                            <p key={idx} className="font-semibold">{it.title} × {it.quantity} <span className="text-gray-500 font-normal">(৳ {it.price})</span></p>
+                            <p key={idx} className="font-semibold">
+                              {it.title} × {it.quantity} <span className="text-gray-500 font-normal">(৳ {it.price})</span>
+                              {(it.selectedSize || it.selectedColor) && (
+                                <span className="block text-[11px] text-gray-500 font-normal">
+                                  {it.selectedSize && `সাইজ: ${it.selectedSize}`}
+                                  {it.selectedSize && it.selectedColor && ' · '}
+                                  {it.selectedColor && `কালার: ${it.selectedColor}`}
+                                </span>
+                              )}
+                            </p>
                           ))}
                           <p className="text-xs text-red-600 font-bold mt-1">মোট ৳ {o.totalPrice}</p>
                         </td>
@@ -359,6 +480,54 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
                       </div>
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">সাইজ (ঐচ্ছিক — জুতা/পোশাকের জন্য)</label>
+                    <div className="flex gap-2">
+                      <input type="text" value={sizeInput}
+                        onChange={(e) => setSizeInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSize(); } }}
+                        placeholder="যেমনঃ 26" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                      <button type="button" onClick={handleAddSize}
+                        className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
+                    </div>
+                    {sizes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {sizes.map((s) => (
+                          <span key={s} className="flex items-center gap-1.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg">
+                            {s}
+                            <button type="button" onClick={() => handleRemoveSize(s)} className="text-gray-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">কালার (ঐচ্ছিক)</label>
+                    <div className="flex gap-2">
+                      <input type="color" value={colorHexInput} onChange={(e) => setColorHexInput(e.target.value)}
+                        className="h-[42px] w-14 border rounded-lg cursor-pointer p-1" />
+                      <input type="text" value={colorNameInput}
+                        onChange={(e) => setColorNameInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColor(); } }}
+                        placeholder="যেমনঃ লাল" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                      <button type="button" onClick={handleAddColor}
+                        className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
+                    </div>
+                    {colors.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {colors.map((c) => (
+                          <span key={c.name} className="flex items-center gap-1.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg">
+                            <span className="h-3.5 w-3.5 rounded-full border border-gray-300" style={{ backgroundColor: c.hex }} />
+                            {c.name}
+                            <button type="button" onClick={() => handleRemoveColor(c.name)} className="text-gray-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <button type="submit" disabled={saving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
                     {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন ও পাবলিশ করুন'}
                   </button>
@@ -378,6 +547,13 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
                           <div>
                             <h4 className="font-bold text-sm text-gray-800 line-clamp-1">{p.title}</h4>
                             <p className="text-xs text-red-600 font-semibold">৳ {p.price}</p>
+                            {((p.sizes && p.sizes.length > 0) || (p.colors && p.colors.length > 0)) && (
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {p.sizes?.length ? `${p.sizes.length} সাইজ` : ''}
+                                {p.sizes?.length && p.colors?.length ? ' · ' : ''}
+                                {p.colors?.length ? `${p.colors.length} কালার` : ''}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1">
@@ -402,6 +578,7 @@ export default function App() {
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [detailProduct, setDetailProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [accountNumber, setAccountNumber] = useState('');
@@ -466,26 +643,28 @@ export default function App() {
     setCurrentView('home');
   };
 
-  // --- MULTI-ITEM CART ---
-  const handleAddToCart = (product) => {
+  // --- MULTI-ITEM CART (variant-aware: same product with different size/color = separate line) ---
+  const handleAddToCart = (product, variant = {}) => {
+    const { selectedSize, selectedColor } = variant;
+    const cartLineId = `${product.id}::${selectedSize || ''}::${selectedColor || ''}`;
     setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
+      const existing = prev.find((item) => item.cartLineId === cartLineId);
       if (existing) {
-        return prev.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map((item) => item.cartLineId === cartLineId ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, selectedSize, selectedColor, cartLineId, quantity: 1 }];
     });
     setIsCartOpen(true);
   };
 
-  const handleUpdateQuantity = (id, delta) => {
+  const handleUpdateQuantity = (cartLineId, delta) => {
     setCart((prev) => prev
-      .map((item) => item.id === id ? { ...item, quantity: item.quantity + delta } : item)
+      .map((item) => item.cartLineId === cartLineId ? { ...item, quantity: item.quantity + delta } : item)
       .filter((item) => item.quantity > 0));
   };
 
-  const handleRemoveFromCart = (id) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
+  const handleRemoveFromCart = (cartLineId) => {
+    setCart((prev) => prev.filter((item) => item.cartLineId !== cartLineId));
   };
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -500,7 +679,7 @@ export default function App() {
     setOrderSubmitting(true);
     try {
       await addDoc(collection(db, 'orders'), {
-        items: cart.map((item) => ({ title: item.title, price: item.price, quantity: item.quantity, image: item.image })),
+        items: cart.map((item) => ({ title: item.title, price: item.price, quantity: item.quantity, image: item.image, selectedSize: item.selectedSize || null, selectedColor: item.selectedColor || null })),
         totalPrice: cartTotal,
         paymentMethod,
         accountNumber,
@@ -606,6 +785,12 @@ export default function App() {
         onCheckout={() => { setIsCartOpen(false); setCurrentView('checkout'); }}
       />
 
+      <ProductDetailModal
+        product={detailProduct}
+        onClose={() => setDetailProduct(null)}
+        onAddToCart={handleAddToCart}
+      />
+
       {currentView === 'checkout' ? (
         <div className="max-w-4xl mx-auto px-4 py-8">
           <button onClick={() => setCurrentView('home')} className="flex items-center text-sm text-gray-600 mb-4 hover:text-red-600">
@@ -618,18 +803,25 @@ export default function App() {
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 divide-y divide-gray-100">
               {cart.map((item) => (
-                <div key={item.id} className="p-4 flex items-center space-x-4">
+                <div key={item.cartLineId} className="p-4 flex items-center space-x-4">
                   <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded" />
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-800 text-sm">{item.title}</h3>
+                    {(item.selectedSize || item.selectedColor) && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {item.selectedSize && `সাইজ: ${item.selectedSize}`}
+                        {item.selectedSize && item.selectedColor && ' · '}
+                        {item.selectedColor && `কালার: ${item.selectedColor}`}
+                      </p>
+                    )}
                     <p className="text-red-600 font-bold text-sm mt-1">৳ {item.price}</p>
                   </div>
                   <div className="flex items-center border rounded-lg">
-                    <button onClick={() => handleUpdateQuantity(item.id, -1)} className="p-2 text-gray-600 hover:bg-gray-50"><Minus className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => handleUpdateQuantity(item.cartLineId, -1)} className="p-2 text-gray-600 hover:bg-gray-50"><Minus className="h-3.5 w-3.5" /></button>
                     <span className="px-3 text-sm font-semibold">{item.quantity}</span>
-                    <button onClick={() => handleUpdateQuantity(item.id, 1)} className="p-2 text-gray-600 hover:bg-gray-50"><Plus className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => handleUpdateQuantity(item.cartLineId, 1)} className="p-2 text-gray-600 hover:bg-gray-50"><Plus className="h-3.5 w-3.5" /></button>
                   </div>
-                  <button onClick={() => handleRemoveFromCart(item.id)} className="text-gray-400 hover:text-red-600 p-1">
+                  <button onClick={() => handleRemoveFromCart(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -757,20 +949,36 @@ export default function App() {
               <p className="text-gray-500 text-sm">কোনো প্রোডাক্ট পাওয়া যায়নি। {products.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                {visibleProducts.map((p) => (
-                  <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                    <img src={p.image} alt={p.title} className="h-40 w-full object-cover" />
-                    <div className="p-3 flex flex-col flex-1">
-                      <h3 className="text-sm font-semibold text-gray-800 leading-snug">{p.title}</h3>
-                      <div className="mt-auto pt-3 flex items-center justify-between">
-                        <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
-                        <button onClick={() => handleAddToCart(p)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
-                          কার্টে যোগ করুন
+                {visibleProducts.map((p) => {
+                  const hasVariants = (p.sizes && p.sizes.length > 0) || (p.colors && p.colors.length > 0);
+                  return (
+                    <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                      <button onClick={() => setDetailProduct(p)} className="block">
+                        <img src={p.image} alt={p.title} className="h-40 w-full object-cover" />
+                      </button>
+                      <div className="p-3 flex flex-col flex-1">
+                        <button onClick={() => setDetailProduct(p)} className="text-left">
+                          <h3 className="text-sm font-semibold text-gray-800 leading-snug">{p.title}</h3>
                         </button>
+                        {hasVariants && (
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            {p.sizes?.length ? `${p.sizes.length} সাইজ` : ''}
+                            {p.sizes?.length && p.colors?.length ? ' · ' : ''}
+                            {p.colors?.length ? `${p.colors.length} কালার` : ''}
+                          </p>
+                        )}
+                        <div className="mt-auto pt-3 flex items-center justify-between">
+                          <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
+                          <button
+                            onClick={() => hasVariants ? setDetailProduct(p) : handleAddToCart(p)}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                            {hasVariants ? 'অপশন বাছাই' : 'কার্টে যোগ করুন'}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
