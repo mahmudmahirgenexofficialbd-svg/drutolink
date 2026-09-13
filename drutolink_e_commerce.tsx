@@ -785,15 +785,6 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Real-time order feed for the admin dashboard
-  useEffect(() => {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsub();
-  }, []);
-
   // --- AUTH (single Firebase Authentication instance, shared by admin + customers) ---
   const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -826,6 +817,24 @@ export default function App() {
       setCustomerProfile(snap.exists() ? snap.data() : null);
     })();
   }, [authUser]);
+
+  // Real-time order feed — must match what the Firestore rules allow each role to read:
+  // admin sees every order, a customer only sees orders where customerId == their own uid.
+  // (A customer querying the whole collection would be denied outright, since "list" rules
+  // reject the entire query if any matched document fails the rule.)
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!authUser) { setOrders([]); return; }
+
+    const q = isAdminLoggedIn
+      ? query(collection(db, 'orders'), orderBy('createdAt', 'desc'))
+      : query(collection(db, 'orders'), where('customerId', '==', authUser.uid), orderBy('createdAt', 'desc'));
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      setOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [authChecked, authUser, isAdminLoggedIn]);
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
