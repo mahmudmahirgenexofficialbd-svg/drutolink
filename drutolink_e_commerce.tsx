@@ -19,6 +19,9 @@ import {
 // এই ইমেইলটা Firebase Console → Authentication → Users এ যে অ্যাডমিন ইউজার বানাবেন, সেটার সাথে হুবহু মিলতে হবে
 const ADMIN_EMAIL = 'admin@drutolink.com';
 
+// সাইটের লোগো — সব হেডার/সাইডবার/ফুটার এই একই লিংক থেকে লোগো দেখায়
+const LOGO_URL = 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/logo.png';
+
 // অর্ডারের ধাপগুলো — ঠিক এই ক্রমে, AdminDashboard-এর স্ট্যাটাস ড্রপডাউনের সাথে মিলিয়ে
 const ORDER_STAGES = ['Pending TrxID', 'Order Placed', 'Sourced in China', 'Delivered'];
 
@@ -323,6 +326,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
     <div className="min-h-screen bg-gray-50 font-body flex items-center justify-center px-4 py-10">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="flex items-center gap-2 justify-center mb-1 cursor-pointer" onClick={goHome}>
+          <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
           <span className="font-display text-2xl font-extrabold tracking-tight text-red-700">
             Druto<span className="font-medium text-gray-700">Link</span>
           </span>
@@ -563,9 +567,12 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     <div className="flex h-screen bg-gray-50 font-body w-full">
       <div className="w-64 bg-red-700 text-white flex flex-col">
         <div className="p-6">
-          <h1 className="font-display text-2xl font-bold">
-            Druto<span className="text-red-100 font-medium">Admin</span>
-          </h1>
+          <div className="flex items-center gap-2 mb-1">
+            <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
+            <h1 className="font-display text-2xl font-bold">
+              Druto<span className="text-red-100 font-medium">Admin</span>
+            </h1>
+          </div>
         </div>
         <nav className="flex-1 px-4 space-y-2">
           <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
@@ -1067,9 +1074,12 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     <div className="flex h-screen bg-gray-50 font-body w-full">
       <div className="w-64 bg-red-700 text-white flex flex-col">
         <div className="p-6">
-          <h1 className="font-display text-2xl font-bold">
-            Druto<span className="text-red-100 font-medium">Worker</span>
-          </h1>
+          <div className="flex items-center gap-2 mb-1">
+            <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
+            <h1 className="font-display text-2xl font-bold">
+              Druto<span className="text-red-100 font-medium">Worker</span>
+            </h1>
+          </div>
           <p className="text-xs text-red-100 mt-1">{workerProfile?.name || workerProfile?.email}</p>
         </div>
         <nav className="flex-1 px-4 space-y-2">
@@ -1829,6 +1839,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('home')}>
             <Menu className="h-6 w-6 lg:hidden" />
+            <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
             <span className="font-display text-2xl font-extrabold tracking-tight text-white">
               Druto<span className="font-medium text-red-100">Link</span>
             </span>
@@ -2085,7 +2096,8 @@ export default function App() {
           {/* Footer */}
           <footer className="bg-red-700 text-red-100">
             <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row justify-between gap-4 text-sm">
-              <span className="font-display text-lg font-bold text-white">
+              <span className="flex items-center gap-2 font-display text-lg font-bold text-white">
+                <img src={LOGO_URL} alt="DrutoLink" className="h-7 w-7 object-contain" />
                 Druto<span className="font-medium text-red-100">Link</span>
               </span>
               <span>© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
