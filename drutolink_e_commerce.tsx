@@ -3,7 +3,7 @@ import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
-  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus
+  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import {
@@ -489,6 +489,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
+  const [editingProductId, setEditingProductId] = useState(null); // null হলে নতুন প্রোডাক্ট যোগ হচ্ছে, id থাকলে ঐ প্রোডাক্ট এডিট হচ্ছে
 
   // --- Size / color variants ---
   const [sizeInput, setSizeInput] = useState('');
@@ -534,26 +535,53 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'products'), {
+      const data = {
         title,
         price,
         category,
         image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
         sizes,
         colors,
-        createdAt: serverTimestamp(),
-        createdBy: 'admin',
-        createdByName: 'Admin',
-      });
+      };
+      if (editingProductId) {
+        await updateDoc(doc(db, 'products', editingProductId), data);
+        alert('প্রোডাক্ট আপডেট হয়েছে!');
+      } else {
+        await addDoc(collection(db, 'products'), {
+          ...data,
+          createdAt: serverTimestamp(),
+          createdBy: 'admin',
+          createdByName: 'Admin',
+        });
+        alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
+      }
+      setEditingProductId(null);
       setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
-      alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
       setActiveTab('orders');
     } catch (err) {
       alert('প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
     } finally {
       setSaving(false);
     }
+  };
+
+  // প্রোডাক্ট কার্ডের এডিট বাটনে ক্লিক করলে ফর্মে বিদ্যমান তথ্য বসে যায়, সেভ করলে addDoc না হয়ে updateDoc হয়
+  const handleStartEditProduct = (p) => {
+    setEditingProductId(p.id);
+    setTitle(p.title || '');
+    setPrice(p.price || '');
+    setImage(p.image || '');
+    setCategory(p.category || CATEGORIES[0].name);
+    setSizes(p.sizes || []);
+    setColors(p.colors || []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEditProduct = () => {
+    setEditingProductId(null);
+    setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+    setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
   };
 
   const handleDeleteProduct = async (id) => {
@@ -692,7 +720,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
           {activeTab === 'products' && (
             <div className="space-y-8">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
-                <h3 className="text-lg font-bold mb-4">নতুন পাইকারি প্রোডাক্ট যোগ করুন</h3>
+                <h3 className="text-lg font-bold mb-4">{editingProductId ? 'প্রোডাক্ট এডিট করুন' : 'নতুন পাইকারি প্রোডাক্ট যোগ করুন'}</h3>
                 <form onSubmit={handleAddProduct} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">প্রোডাক্টের নাম</label>
@@ -775,9 +803,17 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                     )}
                   </div>
 
-                  <button type="submit" disabled={saving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
-                    {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন ও পাবলিশ করুন'}
-                  </button>
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={saving} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
+                      {saving ? 'সেভ হচ্ছে...' : editingProductId ? 'পরিবর্তন সংরক্ষণ করুন' : 'সেভ করুন ও পাবলিশ করুন'}
+                    </button>
+                    {editingProductId && (
+                      <button type="button" onClick={handleCancelEditProduct}
+                        className="px-5 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                        বাতিল
+                      </button>
+                    )}
+                  </div>
                 </form>
               </div>
 
@@ -794,6 +830,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                           <div>
                             <h4 className="font-bold text-sm text-gray-800 line-clamp-1">{p.title}</h4>
                             <p className="text-xs text-red-600 font-semibold">৳ {p.price}</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{p.category}</p>
                             {((p.sizes && p.sizes.length > 0) || (p.colors && p.colors.length > 0)) && (
                               <p className="text-[10px] text-gray-400 mt-0.5">
                                 {p.sizes?.length ? `${p.sizes.length} সাইজ` : ''}
@@ -803,9 +840,14 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                             )}
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1">
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => handleStartEditProduct(p)} className="text-gray-500 hover:text-red-600 p-1">
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1">
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1079,7 +1121,8 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     setSaving(true);
     try {
       await handleAddWorkerProduct({ title, price, category, image, sizes, colors });
-      setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+      setTitle(''); setPrice(''); setImage('');
+      setCategory(workerProfile?.assignedCategory || CATEGORIES[0].name); // ফিক্স: নির্ধারিত ক্যাটাগরি থাকলে সেটাতেই ফিরবে, ভুল করে CATEGORIES[0]-এ চলে যাবে না
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
     } catch (err) {
