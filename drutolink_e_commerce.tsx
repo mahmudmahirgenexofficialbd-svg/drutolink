@@ -47,18 +47,85 @@ function useInView(threshold = 0.25) {
 
 const ORDER_STAGES = ['Pending TrxID', 'Order Placed', 'Sourced in China', 'Delivered'];
 
+// --- "৩ ধাপে অর্ডার করুন" সেকশনের কার্টুন-স্টাইল আইকন ---
+// সহজ, ফ্ল্যাট শেপ দিয়ে আঁকা (কোনো ইমেজ ফাইল লাগে না), প্রতিটা নিজের রঙে —
+// দেখতে যেন একটু মজার/হাতে আঁকা মনে হয়, প্লেইন নম্বরের চেয়ে বেশি প্রাণবন্ত।
+
+function StepIconChoose() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-7 w-7">
+      {/* বাক্স/প্যাকেজ */}
+      <rect x="10" y="20" width="24" height="18" rx="3" fill="#f59e0b" />
+      <rect x="10" y="20" width="24" height="6" rx="2" fill="#fbbf24" />
+      <path d="M10 23 L34 23" stroke="#d97706" strokeWidth="1.2" />
+      <path d="M22 20 L22 38" stroke="#d97706" strokeWidth="1.2" />
+      {/* উপরে ফিতা/বো */}
+      <path d="M18 20 C14 14, 22 12, 22 20" fill="none" stroke="#b45309" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M26 20 C30 14, 22 12, 22 20" fill="none" stroke="#b45309" strokeWidth="1.6" strokeLinecap="round" />
+      {/* পছন্দ বোঝাতে ছোট্ট তারা */}
+      <path d="M37 12 l1.3 2.7 3 0.4 -2.2 2.1 0.5 3 -2.6 -1.4 -2.6 1.4 0.5 -3 -2.2 -2.1 3 -0.4 Z" fill="#fde68a" />
+    </svg>
+  );
+}
+
+function StepIconPay() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-7 w-7">
+      {/* মোবাইল ফোন */}
+      <rect x="14" y="7" width="18" height="34" rx="4" fill="#6d28d9" />
+      <rect x="16.5" y="11" width="13" height="22" rx="1.5" fill="#ede9fe" />
+      <circle cx="23" cy="36.5" r="1.6" fill="#c4b5fd" />
+      {/* স্ক্রিনে টাকা চিহ্ন */}
+      <text x="23" y="26" textAnchor="middle" fontSize="10" fontWeight="800" fill="#6d28d9" fontFamily="sans-serif">৳</text>
+      {/* সফল পেমেন্টের চেকমার্ক বাবল */}
+      <circle cx="35" cy="14" r="7" fill="#22c55e" />
+      <path d="M31.7 14.2 l2 2 3.2 -4" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function StepIconShip() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-7 w-7">
+      {/* কার্গো বক্স */}
+      <rect x="4" y="16" width="20" height="14" rx="2" fill="#0ea5e9" />
+      <rect x="4" y="16" width="20" height="4" rx="1.5" fill="#7dd3fc" />
+      {/* ক্যাব */}
+      <path d="M24 21 h9 l6 6 v3 h-15 Z" fill="#0284c7" />
+      <rect x="29" y="23" width="5" height="4" rx="0.8" fill="#bae6fd" />
+      {/* চাকা */}
+      <circle cx="12" cy="32" r="3.4" fill="#1e293b" />
+      <circle cx="12" cy="32" r="1.3" fill="#94a3b8" />
+      <circle cx="31" cy="32" r="3.4" fill="#1e293b" />
+      <circle cx="31" cy="32" r="1.3" fill="#94a3b8" />
+      {/* গতির দাগ */}
+      <path d="M0 20 h4 M0 25 h3" stroke="#bae6fd" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const STEP_ICONS = [StepIconChoose, StepIconPay, StepIconShip];
+
 // "৩ ধাপে অর্ডার করুন" সেকশনের একেকটা কার্ড। useInView দিয়ে বোঝে কখন স্ক্রল করে
 // চোখের সামনে এসেছে, আর index অনুযায়ী সামান্য দেরি করে একে একে ভেসে ওঠে (স্ট্যাগার ইফেক্ট)।
+// নম্বরের বদলে কার্টুন-স্টাইল আইকন — নম্বরটা এখন ছোট চিপ হিসেবে কোণায় থাকে, ধাপের ক্রমটা বোঝাতে।
 function StepCard({ step, index }) {
   const [ref, inView] = useInView(0.35);
+  const Icon = STEP_ICONS[index];
   return (
     <div
       ref={ref}
       className={`flex gap-4 relative reveal-step ${inView ? 'reveal-step-in' : ''}`}
       style={{ animationDelay: inView ? `${index * 0.15}s` : undefined }}
     >
-      <span className="step-badge font-display h-12 w-12 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl font-extrabold text-white">
-        {step.n}
+      <span
+        className="step-badge relative h-12 w-12 shrink-0 rounded-full bg-white flex items-center justify-center shadow-md"
+        style={{ animationDelay: `${index * 0.35}s` }}
+      >
+        <Icon />
+        <span className="font-display absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-red-800 border-2 border-red-700 flex items-center justify-center text-[10px] font-extrabold text-white">
+          {step.n}
+        </span>
       </span>
       <div className="pt-1">
         <h3 className="font-semibold mb-1">{step.t}</h3>
@@ -68,6 +135,7 @@ function StepCard({ step, index }) {
     </div>
   );
 }
+
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
@@ -92,6 +160,7 @@ html { scroll-behavior: smooth; }
 @keyframes catMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes stepPop { 0% { opacity: 0; transform: translateY(22px) scale(0.94); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes stepBadgePulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.45); } 70% { box-shadow: 0 0 0 10px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+@keyframes stepBadgeFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-5px) rotate(-3deg); } }
 
 .animate-hero-in { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-hero-in-delay { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
@@ -109,7 +178,8 @@ html { scroll-behavior: smooth; }
    .reveal-step-in ক্লাস যোগ হলে (useInView হুক দিয়ে) অ্যানিমেট হয়ে ভেসে ওঠে। */
 .reveal-step { opacity: 0; }
 .reveal-step-in { animation: stepPop 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.reveal-step-in .step-badge { animation: stepBadgePulse 1.6s ease-out 0.4s; }
+.reveal-step-in .step-badge { animation: stepBadgePulse 1.6s ease-out 0.4s, stepBadgeFloat 3.2s ease-in-out 1.2s infinite; }
+.reveal-step-in .step-badge:hover { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash, .cat-marquee-track, .reveal-step-in, .reveal-step-in .step-badge {
