@@ -1836,6 +1836,7 @@ export default function App() {
   const [trxId, setTrxId] = useState('');
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [staffMenuOpen, setStaffMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false); // মোবাইলে হেডারের ৩-বার আইকনে ক্লিক করলে এই ড্রয়ার খোলে
 
   const productsRef = useRef(null);
   const howItWorksRef = useRef(null);
@@ -2422,12 +2423,16 @@ export default function App() {
       {/* Header */}
       <header className="bg-red-700 text-white sticky top-0 z-40 shadow-md shadow-red-900/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setCurrentView('home')}>
-            <Menu className="h-6 w-6 lg:hidden" />
-            <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg transition-transform duration-200 group-hover:scale-105" />
-            <span className="font-display text-2xl font-extrabold tracking-tight text-white">
-              Druto<span className="font-medium text-red-100">Link</span>
-            </span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setMobileNavOpen(true)} className="lg:hidden text-white p-1 -ml-1 transition-opacity hover:opacity-80" aria-label="মেনু খুলুন">
+              <Menu className="h-6 w-6" />
+            </button>
+            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setCurrentView('home')}>
+              <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg transition-transform duration-200 group-hover:scale-105" />
+              <span className="font-display text-2xl font-extrabold tracking-tight text-white">
+                Druto<span className="font-medium text-red-100">Link</span>
+              </span>
+            </div>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="hidden md:flex flex-1 max-w-xl relative">
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
@@ -2478,6 +2483,87 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* মোবাইল নেভিগেশন ড্রয়ার — হেডারের ৩-বার আইকনে ক্লিক করলে বাম থেকে খুলবে */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 lg:hidden animate-fade-in" onClick={() => setMobileNavOpen(false)} />
+      )}
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85%] bg-white shadow-xl transform transition-transform duration-200 lg:hidden flex flex-col ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="bg-red-700 text-white p-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
+            <span className="font-display text-lg font-extrabold">Druto<span className="font-medium text-red-100">Link</span></span>
+          </div>
+          <button onClick={() => setMobileNavOpen(false)} className="text-red-100 hover:text-white p-1 transition-colors" aria-label="মেনু বন্ধ করুন">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-4 overflow-y-auto thin-scroll flex-1">
+          {/* মোবাইল সার্চ — হেডারের সার্চ বার শুধু md+ স্ক্রিনে দেখায়, তাই এখানেও একটা দিয়ে দিলাম */}
+          <form
+            onSubmit={(e) => { e.preventDefault(); setMobileNavOpen(false); scrollToProducts(); }}
+            className="relative mb-5"
+          >
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2.5 pl-4 pr-20 text-gray-900 bg-gray-100 outline-none focus:ring-2 focus:ring-red-300 transition-shadow duration-150" />
+            <button type="button" onClick={() => { setMobileNavOpen(false); openImageSearch(); }} title="ছবি দিয়ে খুঁজুন"
+              className="absolute right-11 top-1.5 text-gray-400 hover:text-red-600 p-1.5 rounded-full transition-colors duration-150">
+              {visual.searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </button>
+            <button type="submit" className="absolute right-1.5 top-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full transition-all duration-150">
+              <Search className="h-4 w-4" />
+            </button>
+          </form>
+
+          {/* অ্যাকাউন্ট ও কার্ট */}
+          <div className="grid grid-cols-2 gap-2 mb-5">
+            <button
+              onClick={() => { setMobileNavOpen(false); if (isCustomerLoggedIn) { setCurrentView('account'); } else { setRedirectAfterLogin('home'); setCurrentView('login'); } }}
+              className="flex flex-col items-center justify-center gap-1 bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-xl py-3 transition-colors">
+              <User className="h-5 w-5 text-red-700" />
+              <span className="text-xs font-medium text-gray-700">{isCustomerLoggedIn ? (customerProfile?.name?.split(' ')[0] || 'অ্যাকাউন্ট') : 'লগ ইন'}</span>
+            </button>
+            <button
+              onClick={() => { setMobileNavOpen(false); setIsCartOpen(true); }}
+              className="relative flex flex-col items-center justify-center gap-1 bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-xl py-3 transition-colors">
+              <ShoppingCart className="h-5 w-5 text-red-700" />
+              <span className="text-xs font-medium text-gray-700">কার্ট{cartCount > 0 ? ` (${cartCount})` : ''}</span>
+            </button>
+          </div>
+
+          {/* ক্যাটাগরি */}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">ক্যাটাগরি</p>
+          <div className="space-y-1 mb-5">
+            <button
+              onClick={() => { setSelectedCategory(null); setMobileNavOpen(false); scrollToProducts(); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${!selectedCategory ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
+              <span className="text-lg">🛍️</span> সব প্রোডাক্ট
+            </button>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.name}
+                onClick={() => { setSelectedCategory(c.name); setMobileNavOpen(false); scrollToProducts(); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategory === c.name ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
+                <span className="text-lg">{c.emoji}</span> {c.name}
+              </button>
+            ))}
+          </div>
+
+          {/* কর্মী/অ্যাডমিন প্রবেশ */}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">স্টাফ</p>
+          <div className="space-y-1">
+            <button onClick={() => { setMobileNavOpen(false); setCurrentView('worker'); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              <Lock className="h-4 w-4" /> কর্মী লগইন
+            </button>
+            <button onClick={() => { setMobileNavOpen(false); setCurrentView('admin'); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              <Lock className="h-4 w-4" /> অ্যাডমিন প্যানেল
+            </button>
+          </div>
+        </div>
+      </div>
 
       <CartDrawer
         isOpen={isCartOpen}
