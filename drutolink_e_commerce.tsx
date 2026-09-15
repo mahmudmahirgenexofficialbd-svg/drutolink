@@ -3,9 +3,9 @@ import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
-  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin
+  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus
 } from 'lucide-react';
-import { db, auth } from './firebase';
+import { db, auth, secondaryAuth } from './firebase';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where,
   serverTimestamp, updateDoc, setDoc, getDoc,
@@ -444,8 +444,41 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 }
 
 // --- SECURE ADMIN DASHBOARD ---
-function AdminDashboard({ goHome, handleLogout, products, orders }) {
+function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker }) {
   const [activeTab, setActiveTab] = useState('orders');
+
+  // --- Worker creation form state ---
+  const [workerName, setWorkerName] = useState('');
+  const [workerEmail, setWorkerEmail] = useState('');
+  const [workerPassword, setWorkerPassword] = useState('');
+  const [workerSaving, setWorkerSaving] = useState(false);
+  const [workerFormError, setWorkerFormError] = useState('');
+
+  const onCreateWorker = async (e) => {
+    e.preventDefault();
+    setWorkerFormError('');
+    if (!workerName || !workerEmail || !workerPassword) {
+      setWorkerFormError('নাম, ইমেইল ও পাসওয়ার্ড — সবগুলো দিন।');
+      return;
+    }
+    if (workerPassword.length < 6) {
+      setWorkerFormError('পাসওয়ার্ড কমপক্ষে ৬ ক্যারেক্টারের হতে হবে।');
+      return;
+    }
+    setWorkerSaving(true);
+    try {
+      await handleCreateWorker({ name: workerName, email: workerEmail, password: workerPassword });
+      setWorkerName(''); setWorkerEmail(''); setWorkerPassword('');
+    } catch (err) {
+      setWorkerFormError(
+        err.code === 'auth/email-already-in-use'
+          ? 'এই ইমেইল দিয়ে আগে থেকেই অ্যাকাউন্ট আছে।'
+          : 'অ্যাকাউন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।'
+      );
+    } finally {
+      setWorkerSaving(false);
+    }
+  };
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
@@ -504,6 +537,8 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
         sizes,
         colors,
         createdAt: serverTimestamp(),
+        createdBy: 'admin',
+        createdByName: 'Admin',
       });
       setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
@@ -541,6 +576,10 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
             <Package className="h-5 w-5" />
             <span>প্রোডাক্ট ({products.length})</span>
           </button>
+          <button onClick={() => setActiveTab('workers')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'workers' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+            <Users className="h-5 w-5" />
+            <span>কর্মী ({workers.length})</span>
+          </button>
         </nav>
         <div className="p-4 border-t border-red-600 space-y-2">
           <button onClick={goHome} className="w-full flex items-center justify-center space-x-2 bg-red-800 hover:bg-red-900 text-white px-4 py-2 rounded-lg transition-colors">
@@ -557,7 +596,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1">
-            {activeTab === 'orders' ? 'অর্ডার ম্যানেজমেন্ট' : 'প্রোডাক্ট ইনভেন্টরি'}
+            {activeTab === 'orders' ? 'অর্ডার ম্যানেজমেন্ট' : activeTab === 'products' ? 'প্রোডাক্ট ইনভেন্টরি' : 'কর্মী ম্যানেজমেন্ট'}
           </h2>
           <span className="text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full">নিরাপদভাবে লগ ইন করা আছে</span>
         </header>
@@ -751,6 +790,287 @@ function AdminDashboard({ goHome, handleLogout, products, orders }) {
               </div>
             </div>
           )}
+
+          {activeTab === 'workers' && (
+            <div className="space-y-8">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-xl">
+                <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-red-600" /> নতুন কর্মী অ্যাকাউন্ট তৈরি করুন
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">এই অ্যাকাউন্ট দিয়ে কর্মী শুধু প্রোডাক্ট লিস্টিং করতে পারবে — অর্ডার বা অন্য কোনো ডেটা দেখতে/বদলাতে পারবে না।</p>
+                <form onSubmit={onCreateWorker} className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">কর্মীর নাম</label>
+                    <input type="text" value={workerName} onChange={(e) => setWorkerName(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="যেমনঃ রহিম উদ্দিন" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ইমেইল (লগইন আইডি)</label>
+                    <input type="email" value={workerEmail} onChange={(e) => setWorkerEmail(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="worker1@drutolink.com" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড</label>
+                    <input type="text" value={workerPassword} onChange={(e) => setWorkerPassword(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="কমপক্ষে ৬ ক্যারেক্টার" />
+                  </div>
+                  {workerFormError && <p className="text-red-600 text-xs">{workerFormError}</p>}
+                  <button type="submit" disabled={workerSaving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
+                    {workerSaving ? 'তৈরি হচ্ছে...' : 'কর্মী অ্যাকাউন্ট তৈরি করুন'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-bold mb-4">কর্মী তালিকা ও লিস্টিং আপডেট ({workers.length} জন)</h3>
+                {workers.length === 0 ? (
+                  <p className="text-gray-500 text-sm">এখনো কোনো কর্মী অ্যাকাউন্ট তৈরি করা হয়নি।</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {workers.map((w) => {
+                      const count = products.filter((p) => p.createdBy === w.id).length;
+                      return (
+                        <div key={w.id} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
+                          <div className="flex items-center space-x-3">
+                            <div className="h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">
+                              {(w.name || w.email || '?')[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-gray-800">{w.name || 'নামহীন'}</h4>
+                              <p className="text-xs text-gray-500">{w.email}</p>
+                            </div>
+                          </div>
+                          <div className="text-right flex items-center gap-3">
+                            <div>
+                              <p className="text-xl font-bold text-red-600 leading-none">{count}</p>
+                              <p className="text-[10px] text-gray-400">টি প্রোডাক্ট</p>
+                            </div>
+                            <button onClick={() => handleDeleteWorker(w.id)} className="text-red-500 hover:text-red-700 p-1" title="কর্মী প্রোফাইল মুছুন">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// --- WORKER DASHBOARD (product-listing-only access) ---
+function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, handleAddWorkerProduct, handleDeleteWorkerProduct }) {
+  const [title, setTitle] = useState('');
+  const [price, setPrice] = useState('');
+  const [image, setImage] = useState('');
+  const [category, setCategory] = useState(CATEGORIES[0].name);
+  const [saving, setSaving] = useState(false);
+  const [sizeInput, setSizeInput] = useState('');
+  const [sizes, setSizes] = useState([]);
+  const [colorNameInput, setColorNameInput] = useState('');
+  const [colorHexInput, setColorHexInput] = useState('#dc2626');
+  const [colors, setColors] = useState([]);
+
+  const handleAddSize = () => {
+    const val = sizeInput.trim();
+    if (!val) return;
+    if (sizes.includes(val)) { setSizeInput(''); return; }
+    setSizes((prev) => [...prev, val]);
+    setSizeInput('');
+  };
+  const handleRemoveSize = (val) => setSizes((prev) => prev.filter((s) => s !== val));
+
+  const handleAddColor = () => {
+    const name = colorNameInput.trim();
+    if (!name) return;
+    if (colors.some((c) => c.name === name)) { setColorNameInput(''); return; }
+    setColors((prev) => [...prev, { name, hex: colorHexInput }]);
+    setColorNameInput('');
+  };
+  const handleRemoveColor = (name) => setColors((prev) => prev.filter((c) => c.name !== name));
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setImage(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title || !price) {
+      alert('প্রোডাক্টের নাম ও দাম দিন।');
+      return;
+    }
+    setSaving(true);
+    try {
+      await handleAddWorkerProduct({ title, price, category, image, sizes, colors });
+      setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+      setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
+      alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
+    } catch (err) {
+      alert('প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50 font-body w-full">
+      <div className="w-64 bg-red-700 text-white flex flex-col">
+        <div className="p-6">
+          <h1 className="font-display text-2xl font-bold">
+            Druto<span className="text-red-100 font-medium">Worker</span>
+          </h1>
+          <p className="text-xs text-red-100 mt-1">{workerProfile?.name || workerProfile?.email}</p>
+        </div>
+        <nav className="flex-1 px-4 space-y-2">
+          <div className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-white text-red-700">
+            <Package className="h-5 w-5" />
+            <span>আমার প্রোডাক্ট ({myProducts.length})</span>
+          </div>
+        </nav>
+        <div className="p-4 border-t border-red-600 space-y-2">
+          <button onClick={goHome} className="w-full flex items-center justify-center space-x-2 bg-red-800 hover:bg-red-900 text-white px-4 py-2 rounded-lg transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            <span>স্টোরে ফিরুন</span>
+          </button>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition-colors">
+            <LogOut className="h-4 w-4" />
+            <span>লগ-আউট</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1">প্রোডাক্ট লিস্টিং</h2>
+          <span className="text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full">কর্মী হিসেবে লগ ইন করা আছে</span>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          <div className="space-y-8">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
+              <h3 className="text-lg font-bold mb-4">নতুন প্রোডাক্ট যোগ করুন</h3>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">প্রোডাক্টের নাম</label>
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="যেমনঃ পুতিয়ান স্পোর্টস জুতা" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ক্যাটাগরি</label>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)}
+                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 bg-white">
+                    {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
+                  <input type="number" value={price} onChange={(e) => setPrice(e.target.value)}
+                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="2500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
+                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                    <input type="file" accept="image/*" onChange={handleImageUpload}
+                      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer" />
+                  </div>
+                  {image && (
+                    <div className="mt-3 flex items-center space-x-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                      <img src={image} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                      <div>
+                        <p className="text-xs font-bold text-red-700">ছবি প্রস্তুত!</p>
+                        <p className="text-[10px] text-gray-500">ফাইল লোড হয়ে গেছে।</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">সাইজ (ঐচ্ছিক)</label>
+                  <div className="flex gap-2">
+                    <input type="text" value={sizeInput}
+                      onChange={(e) => setSizeInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSize(); } }}
+                      placeholder="যেমনঃ 26" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                    <button type="button" onClick={handleAddSize}
+                      className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
+                  </div>
+                  {sizes.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {sizes.map((s) => (
+                        <span key={s} className="flex items-center gap-1.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg">
+                          {s}
+                          <button type="button" onClick={() => handleRemoveSize(s)} className="text-gray-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">কালার (ঐচ্ছিক)</label>
+                  <div className="flex gap-2">
+                    <input type="color" value={colorHexInput} onChange={(e) => setColorHexInput(e.target.value)}
+                      className="h-[42px] w-14 border rounded-lg cursor-pointer p-1" />
+                    <input type="text" value={colorNameInput}
+                      onChange={(e) => setColorNameInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColor(); } }}
+                      placeholder="যেমনঃ লাল" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                    <button type="button" onClick={handleAddColor}
+                      className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
+                  </div>
+                  {colors.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {colors.map((c) => (
+                        <span key={c.name} className="flex items-center gap-1.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg">
+                          <span className="h-3.5 w-3.5 rounded-full border border-gray-300" style={{ backgroundColor: c.hex }} />
+                          {c.name}
+                          <button type="button" onClick={() => handleRemoveColor(c.name)} className="text-gray-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button type="submit" disabled={saving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
+                  {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন ও পাবলিশ করুন'}
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-bold mb-4">আমার লিস্ট করা প্রোডাক্ট ({myProducts.length} টি)</h3>
+              {myProducts.length === 0 ? (
+                <p className="text-gray-500 text-sm">আপনি এখনো কোনো প্রোডাক্ট যোগ করেননি।</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {myProducts.map((p) => (
+                    <div key={p.id} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
+                      <div className="flex items-center space-x-3">
+                        <img src={p.image} alt={p.title} className="h-12 w-12 object-cover rounded" />
+                        <div>
+                          <h4 className="font-bold text-sm text-gray-800 line-clamp-1">{p.title}</h4>
+                          <p className="text-xs text-red-600 font-semibold">৳ {p.price}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteWorkerProduct(p.id)} className="text-red-500 hover:text-red-700 p-1">
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </main>
       </div>
     </div>
@@ -789,6 +1109,8 @@ export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [customerProfile, setCustomerProfile] = useState(null);
+  const [workerProfile, setWorkerProfile] = useState(null);
+  const [profileChecked, setProfileChecked] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
@@ -796,7 +1118,10 @@ export default function App() {
   // Admin is identified by email match, NOT merely by "someone is logged in" —
   // otherwise any signed-in customer would also see the admin dashboard.
   const isAdminLoggedIn = !!authUser && authUser.email === ADMIN_EMAIL;
-  const isCustomerLoggedIn = !!authUser && authUser.email !== ADMIN_EMAIL;
+  // A worker is any non-admin auth user who has a matching doc in the `workers`
+  // collection (created by the admin from the Workers tab).
+  const isWorkerLoggedIn = !!authUser && authUser.email !== ADMIN_EMAIL && !!workerProfile;
+  const isCustomerLoggedIn = !!authUser && authUser.email !== ADMIN_EMAIL && !isWorkerLoggedIn;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -806,17 +1131,41 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Load the logged-in customer's profile (name/phone) from Firestore
+  // Figure out whether the logged-in (non-admin) user is a worker or a regular
+  // customer, and load their profile (name/phone, or worker name) accordingly.
   useEffect(() => {
     if (!authUser || authUser.email === ADMIN_EMAIL) {
       setCustomerProfile(null);
+      setWorkerProfile(null);
+      setProfileChecked(true);
       return;
     }
+    setProfileChecked(false);
     (async () => {
-      const snap = await getDoc(doc(db, 'customers', authUser.uid));
-      setCustomerProfile(snap.exists() ? snap.data() : null);
+      const workerSnap = await getDoc(doc(db, 'workers', authUser.uid));
+      if (workerSnap.exists()) {
+        setWorkerProfile({ id: authUser.uid, ...workerSnap.data() });
+        setCustomerProfile(null);
+      } else {
+        setWorkerProfile(null);
+        const custSnap = await getDoc(doc(db, 'customers', authUser.uid));
+        setCustomerProfile(custSnap.exists() ? custSnap.data() : null);
+      }
+      setProfileChecked(true);
     })();
   }, [authUser]);
+
+  // Live list of all worker accounts — needed for the admin panel's Workers tab
+  // (name/email + real-time product count for each).
+  const [workers, setWorkers] = useState([]);
+  useEffect(() => {
+    if (!isAdminLoggedIn) { setWorkers([]); return; }
+    const q = query(collection(db, 'workers'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setWorkers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [isAdminLoggedIn]);
 
   // Real-time order feed — must match what the Firestore rules allow each role to read:
   // admin sees every order, a customer only sees orders where customerId == their own uid.
@@ -916,6 +1265,64 @@ export default function App() {
     setCurrentView('home');
   };
 
+  // --- WORKER MANAGEMENT (admin-only actions) ---
+  // Uses the secondary Firebase app instance so creating a worker account
+  // doesn't sign the admin's own session out.
+  const handleCreateWorker = async ({ name, email, password }) => {
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await updateProfile(cred.user, { displayName: name });
+    await setDoc(doc(db, 'workers', cred.user.uid), {
+      name, email, createdAt: serverTimestamp(),
+    });
+    await signOut(secondaryAuth);
+  };
+
+  // Removes the worker's profile doc, which revokes their worker-dashboard
+  // access (they'll no longer be recognized as a worker on next login).
+  // Note: this does not delete the underlying Firebase Auth account itself —
+  // that requires the Firebase Admin SDK (e.g. a Cloud Function), which isn't
+  // available from client-side code. For full account deletion, remove the
+  // user from Firebase Console → Authentication as well.
+  const handleDeleteWorker = async (workerId) => {
+    if (!window.confirm('এই কর্মীর প্রোফাইল মুছে ফেলতে চান? (তাদের লগইন অ্যাক্সেস বন্ধ হয়ে যাবে)')) return;
+    await deleteDoc(doc(db, 'workers', workerId));
+  };
+
+  // --- WORKER AUTH ---
+  const [workerLoginError, setWorkerLoginError] = useState('');
+  const [workerLoggingIn, setWorkerLoggingIn] = useState(false);
+
+  const handleWorkerLogin = async ({ email, password }) => {
+    setWorkerLoggingIn(true);
+    setWorkerLoginError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setWorkerLoginError('ইমেইল বা পাসওয়ার্ড ভুল। আবার চেষ্টা করুন।');
+    } finally {
+      setWorkerLoggingIn(false);
+    }
+  };
+
+  // --- WORKER PRODUCT LISTING ---
+  const handleAddWorkerProduct = async ({ title, price, category, image, sizes, colors }) => {
+    await addDoc(collection(db, 'products'), {
+      title,
+      price,
+      category,
+      image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+      sizes,
+      colors,
+      createdAt: serverTimestamp(),
+      createdBy: authUser.uid,
+      createdByName: workerProfile?.name || authUser.email,
+    });
+  };
+
+  const handleDeleteWorkerProduct = async (productId) => {
+    await deleteDoc(doc(db, 'products', productId));
+  };
+
   // --- MULTI-ITEM CART (variant-aware: same product with different size/color = separate line) ---
   const handleAddToCart = (product, variant = {}) => {
     const { selectedSize, selectedColor } = variant;
@@ -994,7 +1401,17 @@ export default function App() {
   }
 
   if (currentView === 'admin' && isAdminLoggedIn) {
-    return <AdminDashboard goHome={() => setCurrentView('home')} handleLogout={handleLogout} products={products} orders={orders} />;
+    return (
+      <AdminDashboard
+        goHome={() => setCurrentView('home')}
+        handleLogout={handleLogout}
+        products={products}
+        orders={orders}
+        workers={workers}
+        handleCreateWorker={handleCreateWorker}
+        handleDeleteWorker={handleDeleteWorker}
+      />
+    );
   }
 
   if (currentView === 'admin' && !isAdminLoggedIn) {
@@ -1016,6 +1433,63 @@ export default function App() {
             {loginError && <p className="text-red-500 text-xs text-left">ভুল পাসওয়ার্ড। প্রবেশ করা যায়নি।</p>}
             <button type="submit" disabled={loggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-60">
               {loggingIn ? 'যাচাই হচ্ছে...' : 'আনলক করুন'}
+            </button>
+          </form>
+          <button onClick={() => setCurrentView('home')} className="mt-4 text-sm text-gray-500 hover:text-gray-800 underline">
+            স্টোরে ফিরে যান
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profileChecked && currentView === 'worker') {
+    return <div className="min-h-screen flex items-center justify-center text-gray-500 font-body">লোড হচ্ছে...</div>;
+  }
+
+  if (currentView === 'worker' && isWorkerLoggedIn) {
+    return (
+      <WorkerDashboard
+        goHome={() => setCurrentView('home')}
+        handleLogout={handleLogout}
+        workerProfile={workerProfile}
+        myProducts={products.filter((p) => p.createdBy === authUser.uid)}
+        handleAddWorkerProduct={handleAddWorkerProduct}
+        handleDeleteWorkerProduct={handleDeleteWorkerProduct}
+      />
+    );
+  }
+
+  if (currentView === 'worker' && !isWorkerLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center font-body px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+          <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Users className="h-6 w-6" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">কর্মী লগইন</h2>
+          <p className="text-sm text-gray-500 mb-6">অ্যাডমিনের দেওয়া ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.target;
+              handleWorkerLogin({ email: form.workerEmail.value, password: form.workerPassword.value });
+            }}
+            className="space-y-4 text-left"
+          >
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ইমেইল</label>
+              <input name="workerEmail" type="email" required
+                className="w-full border border-gray-300 rounded-lg py-3 px-4 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড</label>
+              <input name="workerPassword" type="password" required
+                className="w-full border border-gray-300 rounded-lg py-3 px-4 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
+            </div>
+            {workerLoginError && <p className="text-red-500 text-xs">{workerLoginError}</p>}
+            <button type="submit" disabled={workerLoggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-60">
+              {workerLoggingIn ? 'যাচাই হচ্ছে...' : 'লগইন করুন'}
             </button>
           </form>
           <button onClick={() => setCurrentView('home')} className="mt-4 text-sm text-gray-500 hover:text-gray-800 underline">
@@ -1377,6 +1851,9 @@ export default function App() {
                 Druto<span className="font-medium text-red-100">Link</span>
               </span>
               <span>© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
+              <button onClick={() => setCurrentView('worker')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto mr-4">
+                কর্মী লগইন
+              </button>
               <button onClick={() => setCurrentView('admin')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto">
                 অ্যাডমিন প্যানেল
               </button>
