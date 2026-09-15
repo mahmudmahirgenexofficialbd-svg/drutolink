@@ -47,6 +47,7 @@ html { scroll-behavior: smooth; }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes floatSlow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes dashMove { to { stroke-dashoffset: -24; } }
+@keyframes catMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 .animate-hero-in { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-hero-in-delay { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
@@ -55,8 +56,13 @@ html { scroll-behavior: smooth; }
 .animate-float { animation: floatSlow 5s ease-in-out infinite; }
 .route-dash { stroke-dasharray: 6 6; animation: dashMove 1.2s linear infinite; }
 
+/* ক্যাটাগরি বার — বাম থেকে ডানে অনবরত স্ক্রল হয়। লিস্টটা দুইবার বসিয়ে
+   -50% পর্যন্ত সরালেই লুপ নিরবচ্ছিন্ন দেখায় (কোনো ঝাঁকুনি বা ফাঁকা জায়গা পড়ে না)। */
+.cat-marquee-track { animation: catMarquee 26s linear infinite; }
+.cat-marquee-track:hover, .cat-marquee-track:focus-within { animation-play-state: paused; }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash {
+  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash, .cat-marquee-track {
     animation: none !important;
   }
   html { scroll-behavior: auto; }
@@ -2200,14 +2206,17 @@ export default function App() {
                 <button onClick={() => setSelectedCategory(null)} className="text-xs text-red-600 hover:underline transition-colors">সব দেখুন ✕</button>
               )}
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-2 thin-scroll">
-              {CATEGORIES.map((c) => (
-                <button key={c.name} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); scrollToProducts(); }}
-                  className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selectedCategory === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
-                  <span className="text-2xl">{c.emoji}</span>
-                  <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
-                </button>
-              ))}
+            <div className="overflow-hidden pb-2">
+              <div className="flex gap-3 w-max cat-marquee-track">
+                {/* তালিকাটা দুইবার বসানো হয়েছে যাতে -50% পর্যন্ত সরলে লুপটা নিরবচ্ছিন্ন (seamless) দেখায় */}
+                {[...CATEGORIES, ...CATEGORIES].map((c, i) => (
+                  <button key={`${c.name}-${i}`} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); scrollToProducts(); }}
+                    className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selectedCategory === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
+                    <span className="text-2xl">{c.emoji}</span>
+                    <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
 
