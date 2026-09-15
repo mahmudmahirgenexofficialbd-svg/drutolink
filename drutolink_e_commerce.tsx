@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
   Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
-  Camera, Loader2
+  Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
@@ -613,8 +613,305 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 }
 
 // --- SECURE ADMIN DASHBOARD ---
+
+// Firestore Timestamp বা প্লেইন ভ্যালু, দুটো থেকেই নিরাপদে JS Date বের করে
+function toJsDate(ts) {
+  if (!ts) return null;
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+const DAY_LABELS_BN = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+
+/** ছোট্ট KPI কার্ড — আইকন, লেবেল, বড় সংখ্যা, আর একটা সহায়ক সাব-টেক্সট */
+function KpiCard({ icon: Icon, label, value, sub, accent }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-4 sm:p-5">
+      <div className="flex items-center justify-between mb-3">
+        <span className={`h-10 w-10 rounded-lg flex items-center justify-center ${accent.bg}`}>
+          <Icon className={`h-5 w-5 ${accent.text}`} />
+        </span>
+      </div>
+      <p className="text-xl sm:text-2xl font-extrabold text-gray-900 font-display leading-tight">{value}</p>
+      <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{label}</p>
+      {sub && <p className="text-[11px] text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+/** একটা লেবেলড হরাইজন্টাল বার — অর্ডার স্ট্যাটাস ব্রেকডাউন, ক্যাটাগরি ডিস্ট্রিবিউশন ইত্যাদিতে ব্যবহৃত */
+function StatBar({ label, count, max, colorClass, suffix }) {
+  const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+        <span className="text-gray-700 font-medium truncate pr-2">{label}</span>
+        <span className="text-gray-500 shrink-0">{count}{suffix || ''}</span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${colorClass} transition-all duration-500`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** প্রফেশনাল ওভারভিউ ড্যাশবোর্ড — সব ডেটার এক নজরে সারসংক্ষেপ, শুধু props হিসেবে পাওয়া
+    products/orders/workers/withdrawalRequests থেকে হিসাব করা, আলাদা কোনো API/কল লাগে না। */
+function OverviewTab({ products, orders, workers, withdrawalRequests }) {
+  const stats = useMemo(() => {
+    const num = (v) => { const n = Number(v); return isNaN(n) ? 0 : n; };
+
+    const totalOrders = orders.length;
+    const pendingOrders = orders.filter((o) => o.status === 'Pending TrxID').length;
+    const confirmedOrders = orders.filter((o) => o.status !== 'Pending TrxID');
+    const confirmedRevenue = confirmedOrders.reduce((sum, o) => sum + num(o.totalPrice), 0);
+    const deliveredOrders = orders.filter((o) => o.status === 'Delivered').length;
+    const avgOrderValue = confirmedOrders.length > 0 ? Math.round(confirmedRevenue / confirmedOrders.length) : 0;
+
+    const pendingWithdrawalAmount = withdrawalRequests
+      .filter((r) => r.status === 'pending')
+      .reduce((sum, r) => sum + num(r.amount), 0);
+
+    // --- অর্ডার স্ট্যাটাস ব্রেকডাউন ---
+    const stageCounts = ORDER_STAGES.map((stage) => ({
+      stage,
+      count: orders.filter((o) => o.status === stage).length,
+    }));
+    const maxStageCount = Math.max(1, ...stageCounts.map((s) => s.count));
+
+    // --- গত ১৪ দিনের অর্ডার ট্রেন্ড ---
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      days.push({ date: d, count: 0, revenue: 0 });
+    }
+    orders.forEach((o) => {
+      const od = toJsDate(o.createdAt);
+      if (!od) return;
+      const odDay = new Date(od); odDay.setHours(0, 0, 0, 0);
+      const bucket = days.find((d) => d.date.getTime() === odDay.getTime());
+      if (bucket) { bucket.count += 1; if (o.status !== 'Pending TrxID') bucket.revenue += num(o.totalPrice); }
+    });
+    const maxDayCount = Math.max(1, ...days.map((d) => d.count));
+
+    // --- ক্যাটাগরি অনুযায়ী প্রোডাক্ট বিতরণ ---
+    const catMap = new Map();
+    products.forEach((p) => {
+      const key = p.category || 'অন্যান্য';
+      catMap.set(key, (catMap.get(key) || 0) + 1);
+    });
+    const categoryDist = [...catMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 6);
+    const maxCatCount = Math.max(1, ...categoryDist.map((c) => c.count));
+
+    // --- সবচেয়ে বেশি বিক্রি হওয়া প্রোডাক্ট (অর্ডার আইটেম থেকে) ---
+    const soldMap = new Map();
+    orders.forEach((o) => {
+      (o.items || []).forEach((it) => {
+        const key = it.title || 'অজানা';
+        const prev = soldMap.get(key) || { title: key, qty: 0, revenue: 0 };
+        prev.qty += num(it.quantity) || 1;
+        prev.revenue += num(it.price) * (num(it.quantity) || 1);
+        soldMap.set(key, prev);
+      });
+    });
+    const topProducts = [...soldMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
+    const maxSoldQty = Math.max(1, ...topProducts.map((p) => p.qty));
+
+    // --- কর্মী লিডারবোর্ড (কে কত প্রোডাক্ট তুলেছে, টার্গেটের কত %) ---
+    const workerStats = workers
+      .map((w) => {
+        const listed = products.filter((p) => p.createdBy === w.id).length;
+        const target = num(w.listingTarget);
+        const progress = target > 0 ? Math.min(100, Math.round((listed / target) * 100)) : null;
+        return { id: w.id, name: w.name || w.email, listed, target, progress };
+      })
+      .sort((a, b) => b.listed - a.listed)
+      .slice(0, 5);
+
+    const recentOrders = orders.slice(0, 5);
+
+    return {
+      totalOrders, pendingOrders, confirmedRevenue, deliveredOrders, avgOrderValue,
+      pendingWithdrawalAmount, stageCounts, maxStageCount, days, maxDayCount,
+      categoryDist, maxCatCount, topProducts, maxSoldQty, workerStats, recentOrders,
+    };
+  }, [products, orders, workers, withdrawalRequests]);
+
+  const STAGE_COLORS = { 'Pending TrxID': 'bg-amber-400', 'Order Placed': 'bg-blue-500', 'Sourced in China': 'bg-purple-500', 'Delivered': 'bg-green-500' };
+  const STAGE_LABELS_BN = { 'Pending TrxID': 'TrxID অপেক্ষমান', 'Order Placed': 'অর্ডার প্লেসড', 'Sourced in China': 'চীনে সোর্সিং', 'Delivered': 'ডেলিভারড' };
+  const maxDayRevenue = Math.max(1, ...stats.days.map((d) => d.revenue));
+
+  return (
+    <div className="space-y-6">
+      {/* KPI কার্ড সারি */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <KpiCard icon={ShoppingBag} label="মোট অর্ডার" value={stats.totalOrders} accent={{ bg: 'bg-blue-50', text: 'text-blue-600' }} />
+        <KpiCard icon={Wallet} label="নিশ্চিত আয়" value={`৳ ${stats.confirmedRevenue.toLocaleString('en-BD')}`} sub={`গড় অর্ডার ৳ ${stats.avgOrderValue}`} accent={{ bg: 'bg-green-50', text: 'text-green-600' }} />
+        <KpiCard icon={Clock} label="TrxID অপেক্ষমান" value={stats.pendingOrders} accent={{ bg: 'bg-amber-50', text: 'text-amber-600' }} />
+        <KpiCard icon={Package} label="মোট প্রোডাক্ট" value={products.length} accent={{ bg: 'bg-purple-50', text: 'text-purple-600' }} />
+        <KpiCard icon={Users} label="সক্রিয় কর্মী" value={workers.length} accent={{ bg: 'bg-indigo-50', text: 'text-indigo-600' }} />
+        <KpiCard icon={Banknote} label="উত্তোলন বাকি" value={`৳ ${stats.pendingWithdrawalAmount.toLocaleString('en-BD')}`} accent={{ bg: 'bg-red-50', text: 'text-red-600' }} />
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* অর্ডার স্ট্যাটাস ব্রেকডাউন */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-5 sm:p-6">
+          <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-red-600" /> অর্ডার স্ট্যাটাস
+          </h3>
+          <div className="space-y-3.5">
+            {stats.stageCounts.map((s) => (
+              <StatBar key={s.stage} label={STAGE_LABELS_BN[s.stage]} count={s.count} max={stats.maxStageCount} colorClass={STAGE_COLORS[s.stage]} />
+            ))}
+          </div>
+          {stats.deliveredOrders > 0 && stats.totalOrders > 0 && (
+            <p className="text-[11px] text-gray-400 mt-4 pt-3 border-t border-gray-100">
+              {Math.round((stats.deliveredOrders / stats.totalOrders) * 100)}% অর্ডার সফলভাবে ডেলিভার হয়েছে
+            </p>
+          )}
+        </div>
+
+        {/* গত ১৪ দিনের অর্ডার ট্রেন্ড */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-5 sm:p-6">
+          <h3 className="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-red-600" /> গত ১৪ দিনের অর্ডার
+          </h3>
+          <p className="text-xs text-gray-400 mb-5">প্রতিটা বার একদিনের মোট অর্ডার সংখ্যা বোঝায়</p>
+          <div className="flex items-end gap-1.5 sm:gap-2 h-32">
+            {stats.days.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                <div
+                  className={`w-full rounded-t-md transition-all duration-500 ${d.count > 0 ? 'bg-red-500 group-hover:bg-red-600' : 'bg-gray-100'}`}
+                  style={{ height: `${Math.max(4, (d.count / stats.maxDayCount) * 100)}%` }}
+                  title={`${d.date.toLocaleDateString('bn-BD')}: ${d.count} অর্ডার, ৳ ${d.revenue}`}
+                />
+                <span className="text-[9px] text-gray-400 mt-1.5">{DAY_LABELS_BN[d.date.getDay()]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* ক্যাটাগরি ডিস্ট্রিবিউশন */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-5 sm:p-6">
+          <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Package className="h-4 w-4 text-red-600" /> ক্যাটাগরি অনুযায়ী প্রোডাক্ট
+          </h3>
+          {stats.categoryDist.length === 0 ? (
+            <p className="text-sm text-gray-400">এখনো কোনো প্রোডাক্ট নেই।</p>
+          ) : (
+            <div className="space-y-3.5">
+              {stats.categoryDist.map((c) => (
+                <StatBar key={c.name} label={c.name} count={c.count} max={stats.maxCatCount} colorClass="bg-red-500" suffix=" টি" />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* সবচেয়ে বেশি বিক্রি হওয়া প্রোডাক্ট */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-5 sm:p-6">
+          <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Award className="h-4 w-4 text-red-600" /> সেরা বিক্রিত প্রোডাক্ট
+          </h3>
+          {stats.topProducts.length === 0 ? (
+            <p className="text-sm text-gray-400">এখনো কোনো অর্ডার আসেনি।</p>
+          ) : (
+            <div className="space-y-3.5">
+              {stats.topProducts.map((p, i) => (
+                <div key={p.title} className="flex items-center gap-3">
+                  <span className="h-6 w-6 shrink-0 rounded-full bg-red-50 text-red-600 text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+                      <span className="text-gray-700 font-medium truncate pr-2">{p.title}</span>
+                      <span className="text-gray-500 shrink-0">{p.qty} বিক্রি</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-red-500 transition-all duration-500" style={{ width: `${Math.round((p.qty / stats.maxSoldQty) * 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* সাম্প্রতিক অর্ডার */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-5 sm:p-6">
+          <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4 text-red-600" /> সাম্প্রতিক অর্ডার
+          </h3>
+          {stats.recentOrders.length === 0 ? (
+            <p className="text-sm text-gray-400">এখনো কোনো অর্ডার আসেনি।</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {stats.recentOrders.map((o) => (
+                <div key={o.id} className="py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{o.customerName || o.customerEmail || 'অজানা কাস্টমার'}</p>
+                    <p className="text-[11px] text-gray-400">{(o.items || []).length} আইটেম · ৳ {o.totalPrice}</p>
+                  </div>
+                  <span className={`text-[11px] font-bold px-2 py-1 rounded-full shrink-0 ${
+                    o.status === 'Delivered' ? 'bg-green-100 text-green-700'
+                    : o.status === 'Pending TrxID' ? 'bg-amber-100 text-amber-700'
+                    : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {STAGE_LABELS_BN[o.status] || o.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* কর্মী লিডারবোর্ড */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 p-5 sm:p-6">
+          <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4 text-red-600" /> কর্মী লিডারবোর্ড
+          </h3>
+          {stats.workerStats.length === 0 ? (
+            <p className="text-sm text-gray-400">এখনো কোনো কর্মী নেই।</p>
+          ) : (
+            <div className="space-y-3.5">
+              {stats.workerStats.map((w, i) => (
+                <div key={w.id} className="flex items-center gap-3">
+                  <span className="h-6 w-6 shrink-0 rounded-full bg-red-50 text-red-600 text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+                      <span className="text-gray-700 font-medium truncate pr-2">{w.name}</span>
+                      <span className="text-gray-500 shrink-0">{w.listed}{w.target > 0 ? ` / ${w.target}` : ' টি'}</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${w.progress != null && w.progress >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`}
+                        style={{ width: w.progress != null ? `${w.progress}%` : '100%' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {stats.pendingOrders > 0 && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{stats.pendingOrders} টি অর্ডারের TrxID এখনো যাচাই করা বাকি — "অর্ডার ও TrxID" ট্যাবে গিয়ে দেখুন।</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal }) {
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
 
   // --- Worker creation form state ---
@@ -777,6 +1074,10 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
           </button>
         </div>
         <nav className="flex-1 px-4 space-y-2">
+          <button onClick={() => { setActiveTab('overview'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 ${activeTab === 'overview' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:bg-red-800'}`}>
+            <LayoutDashboard className="h-5 w-5" />
+            <span>ওভারভিউ</span>
+          </button>
           <button onClick={() => { setActiveTab('orders'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 ${activeTab === 'orders' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:bg-red-800'}`}>
             <ShoppingBag className="h-5 w-5" />
             <span>অর্ডার ও TrxID ({orders.length})</span>
@@ -809,13 +1110,16 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
               <Menu className="h-6 w-6" />
             </button>
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1 truncate">
-              {activeTab === 'orders' ? 'অর্ডার ম্যানেজমেন্ট' : activeTab === 'products' ? 'প্রোডাক্ট ইনভেন্টরি' : 'কর্মী ম্যানেজমেন্ট'}
+              {activeTab === 'overview' ? 'ড্যাশবোর্ড ওভারভিউ' : activeTab === 'orders' ? 'অর্ডার ম্যানেজমেন্ট' : activeTab === 'products' ? 'প্রোডাক্ট ইনভেন্টরি' : 'কর্মী ম্যানেজমেন্ট'}
             </h2>
           </div>
           <span className="hidden sm:inline text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full shrink-0">নিরাপদভাবে লগ ইন করা আছে</span>
         </header>
 
         <main className="flex-1 overflow-y-auto thin-scroll p-4 sm:p-8">
+          {activeTab === 'overview' && (
+            <OverviewTab products={products} orders={orders} workers={workers} withdrawalRequests={withdrawalRequests} />
+          )}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
               <h3 className="text-lg font-bold mb-4">সাম্প্রতিক অর্ডার (ম্যানুয়াল যাচাই)</h3>
