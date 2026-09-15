@@ -326,7 +326,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
     <div className="min-h-screen bg-gray-50 font-body flex items-center justify-center px-4 py-10">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="flex items-center gap-2 justify-center mb-1 cursor-pointer" onClick={goHome}>
-          <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
+          <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg" />
           <span className="font-display text-2xl font-extrabold tracking-tight text-red-700">
             Druto<span className="font-medium text-gray-700">Link</span>
           </span>
@@ -450,6 +450,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 // --- SECURE ADMIN DASHBOARD ---
 function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal }) {
   const [activeTab, setActiveTab] = useState('orders');
+  const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
 
   // --- Worker creation form state ---
   const [workerName, setWorkerName] = useState('');
@@ -564,26 +565,34 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-body w-full">
-      <div className="w-64 bg-red-700 text-white flex flex-col">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
-            <h1 className="font-display text-2xl font-bold">
-              Druto<span className="text-red-100 font-medium">Admin</span>
-            </h1>
+    <div className="flex h-screen bg-gray-50 font-body w-full overflow-hidden">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-red-700 text-white flex flex-col transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+        <div className="p-6 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg" />
+              <h1 className="font-display text-2xl font-bold">
+                Druto<span className="text-red-100 font-medium">Admin</span>
+              </h1>
+            </div>
           </div>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-red-100 hover:text-white p-1">
+            <X className="h-6 w-6" />
+          </button>
         </div>
         <nav className="flex-1 px-4 space-y-2">
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+          <button onClick={() => { setActiveTab('orders'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
             <ShoppingBag className="h-5 w-5" />
             <span>অর্ডার ও TrxID ({orders.length})</span>
           </button>
-          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+          <button onClick={() => { setActiveTab('products'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
             <Package className="h-5 w-5" />
             <span>প্রোডাক্ট ({products.length})</span>
           </button>
-          <button onClick={() => setActiveTab('workers')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'workers' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+          <button onClick={() => { setActiveTab('workers'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'workers' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
             <Users className="h-5 w-5" />
             <span>কর্মী ({workers.length})</span>
           </button>
@@ -600,21 +609,27 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1">
-            {activeTab === 'orders' ? 'অর্ডার ম্যানেজমেন্ট' : activeTab === 'products' ? 'প্রোডাক্ট ইনভেন্টরি' : 'কর্মী ম্যানেজমেন্ট'}
-          </h2>
-          <span className="text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full">নিরাপদভাবে লগ ইন করা আছে</span>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-8 py-4 flex justify-between items-center gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-600 hover:text-red-700 p-1 shrink-0">
+              <Menu className="h-6 w-6" />
+            </button>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1 truncate">
+              {activeTab === 'orders' ? 'অর্ডার ম্যানেজমেন্ট' : activeTab === 'products' ? 'প্রোডাক্ট ইনভেন্টরি' : 'কর্মী ম্যানেজমেন্ট'}
+            </h2>
+          </div>
+          <span className="hidden sm:inline text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full shrink-0">নিরাপদভাবে লগ ইন করা আছে</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
           {activeTab === 'orders' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-bold mb-4">সাম্প্রতিক অর্ডার (ম্যানুয়াল যাচাই)</h3>
               {orders.length === 0 ? (
                 <p className="text-gray-500 text-sm">এখনো কোনো অর্ডার আসেনি।</p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
@@ -669,6 +684,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}
@@ -859,6 +875,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 {withdrawalRequests.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো উত্তোলনের অনুরোধ আসেনি।</p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
@@ -900,6 +917,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -989,6 +1007,7 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
 
 // --- WORKER DASHBOARD (product-listing-only access) ---
 function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, handleAddWorkerProduct, handleDeleteWorkerProduct, myWithdrawalRequests, handleRequestWithdrawal }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
@@ -1071,16 +1090,24 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-body w-full">
-      <div className="w-64 bg-red-700 text-white flex flex-col">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
-            <h1 className="font-display text-2xl font-bold">
-              Druto<span className="text-red-100 font-medium">Worker</span>
-            </h1>
+    <div className="flex h-screen bg-gray-50 font-body w-full overflow-hidden">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-red-700 text-white flex flex-col transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+        <div className="p-6 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg" />
+              <h1 className="font-display text-2xl font-bold">
+                Druto<span className="text-red-100 font-medium">Worker</span>
+              </h1>
+            </div>
+            <p className="text-xs text-red-100 mt-1">{workerProfile?.name || workerProfile?.email}</p>
           </div>
-          <p className="text-xs text-red-100 mt-1">{workerProfile?.name || workerProfile?.email}</p>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-red-100 hover:text-white p-1">
+            <X className="h-6 w-6" />
+          </button>
         </div>
         <nav className="flex-1 px-4 space-y-2">
           <div className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-white text-red-700">
@@ -1100,13 +1127,18 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1">প্রোডাক্ট লিস্টিং</h2>
-          <span className="text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full">কর্মী হিসেবে লগ ইন করা আছে</span>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-8 py-4 flex justify-between items-center gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-600 hover:text-red-700 p-1 shrink-0">
+              <Menu className="h-6 w-6" />
+            </button>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800 border-b-2 border-red-600 pb-1 truncate">প্রোডাক্ট লিস্টিং</h2>
+          </div>
+          <span className="hidden sm:inline text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full shrink-0">কর্মী হিসেবে লগ ইন করা আছে</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
           <div className="space-y-8">
             {/* --- অ্যাডমিনের সেট করা ক্যাটাগরি/টার্গেট/আয়ের লাইভ তথ্য-বক্স --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1839,7 +1871,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('home')}>
             <Menu className="h-6 w-6 lg:hidden" />
-            <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 object-contain" />
+            <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg" />
             <span className="font-display text-2xl font-extrabold tracking-tight text-white">
               Druto<span className="font-medium text-red-100">Link</span>
             </span>
@@ -2097,7 +2129,7 @@ export default function App() {
           <footer className="bg-red-700 text-red-100">
             <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row justify-between gap-4 text-sm">
               <span className="flex items-center gap-2 font-display text-lg font-bold text-white">
-                <img src={LOGO_URL} alt="DrutoLink" className="h-7 w-7 object-contain" />
+                <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
                 Druto<span className="font-medium text-red-100">Link</span>
               </span>
               <span>© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
