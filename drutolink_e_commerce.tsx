@@ -444,7 +444,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 }
 
 // --- SECURE ADMIN DASHBOARD ---
-function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker }) {
+function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal }) {
   const [activeTab, setActiveTab] = useState('orders');
 
   // --- Worker creation form state ---
@@ -822,37 +822,77 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
               </div>
 
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-bold mb-4">কর্মী তালিকা ও লিস্টিং আপডেট ({workers.length} জন)</h3>
+                <h3 className="text-lg font-bold mb-4">কর্মী তালিকা, টার্গেট ও পেমেন্ট সেটিংস ({workers.length} জন)</h3>
                 {workers.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো কর্মী অ্যাকাউন্ট তৈরি করা হয়নি।</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {workers.map((w) => {
-                      const count = products.filter((p) => p.createdBy === w.id).length;
-                      return (
-                        <div key={w.id} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
-                          <div className="flex items-center space-x-3">
-                            <div className="h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">
-                              {(w.name || w.email || '?')[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm text-gray-800">{w.name || 'নামহীন'}</h4>
-                              <p className="text-xs text-gray-500">{w.email}</p>
-                            </div>
-                          </div>
-                          <div className="text-right flex items-center gap-3">
-                            <div>
-                              <p className="text-xl font-bold text-red-600 leading-none">{count}</p>
-                              <p className="text-[10px] text-gray-400">টি প্রোডাক্ট</p>
-                            </div>
-                            <button onClick={() => handleDeleteWorker(w.id)} className="text-red-500 hover:text-red-700 p-1" title="কর্মী প্রোফাইল মুছুন">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {workers.map((w) => (
+                      <WorkerCard
+                        key={w.id}
+                        worker={w}
+                        productCount={products.filter((p) => p.createdBy === w.id).length}
+                        onSaveSettings={handleUpdateWorkerSettings}
+                        onDeleteWorker={handleDeleteWorker}
+                      />
+                    ))}
                   </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-bold mb-4">
+                  পেমেন্ট / উত্তোলনের অনুরোধ
+                  {withdrawalRequests.filter((r) => r.status === 'pending').length > 0 && (
+                    <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full align-middle">
+                      {withdrawalRequests.filter((r) => r.status === 'pending').length} টি অপেক্ষমান
+                    </span>
+                  )}
+                </h3>
+                {withdrawalRequests.length === 0 ? (
+                  <p className="text-gray-500 text-sm">এখনো কোনো উত্তোলনের অনুরোধ আসেনি।</p>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
+                        <th className="p-3 font-medium">কর্মী</th>
+                        <th className="p-3 font-medium">পরিমাণ</th>
+                        <th className="p-3 font-medium">স্ট্যাটাস</th>
+                        <th className="p-3 font-medium">অ্যাকশন</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {withdrawalRequests.map((r) => (
+                        <tr key={r.id} className="border-b border-gray-100 align-middle">
+                          <td className="p-3 text-sm font-semibold">{r.workerName}</td>
+                          <td className="p-3 text-sm text-red-600 font-bold">৳ {r.amount}</td>
+                          <td className="p-3">
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                              r.status === 'paid' ? 'bg-green-100 text-green-700'
+                              : r.status === 'rejected' ? 'bg-gray-200 text-gray-600'
+                              : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {r.status === 'paid' ? 'পরিশোধিত' : r.status === 'rejected' ? 'বাতিল' : 'অপেক্ষমান'}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {r.status === 'pending' && (
+                              <div className="flex gap-2">
+                                <button onClick={() => handleProcessWithdrawal(r.id, 'paid')}
+                                  className="flex items-center space-x-1 text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded text-xs font-semibold">
+                                  <CheckCircle className="h-3.5 w-3.5" /><span>পরিশোধ হয়েছে</span>
+                                </button>
+                                <button onClick={() => handleProcessWithdrawal(r.id, 'rejected')}
+                                  className="flex items-center space-x-1 text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded text-xs font-semibold">
+                                  <X className="h-3.5 w-3.5" /><span>বাতিল করুন</span>
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>
@@ -863,13 +903,91 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   );
 }
 
+// --- WORKER CARD (in AdminDashboard's Workers tab) — assign category, listing target, per-listing rate ---
+function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
+  const [assignedCategory, setAssignedCategory] = useState(worker.assignedCategory || '');
+  const [listingTarget, setListingTarget] = useState(worker.listingTarget ?? '');
+  const [ratePerListing, setRatePerListing] = useState(worker.ratePerListing ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const earned = productCount * (Number(ratePerListing) || 0);
+
+  const onSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await onSaveSettings(worker.id, { assignedCategory, listingTarget, ratePerListing });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">
+            {(worker.name || worker.email || '?')[0].toUpperCase()}
+          </div>
+          <div>
+            <h4 className="font-bold text-sm text-gray-800">{worker.name || 'নামহীন'}</h4>
+            <p className="text-xs text-gray-500">{worker.email}</p>
+          </div>
+        </div>
+        <div className="text-right flex items-center gap-3">
+          <div>
+            <p className="text-xl font-bold text-red-600 leading-none">{productCount}</p>
+            <p className="text-[10px] text-gray-400">টি লিস্টিং</p>
+          </div>
+          <button onClick={() => onDeleteWorker(worker.id)} className="text-red-500 hover:text-red-700 p-1" title="কর্মী প্রোফাইল মুছুন">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <label className="block text-[11px] font-medium text-gray-600 mb-1">অ্যাসাইন করা ক্যাটাগরি</label>
+          <select value={assignedCategory} onChange={(e) => setAssignedCategory(e.target.value)}
+            className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 bg-white">
+            <option value="">সব ক্যাটাগরি (নির্দিষ্ট নয়)</option>
+            {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-gray-600 mb-1">লিস্টিং টার্গেট</label>
+          <input type="number" min="0" value={listingTarget} onChange={(e) => setListingTarget(e.target.value)}
+            placeholder="যেমনঃ 100" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500" />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-gray-600 mb-1">প্রতি লিস্টিং রেট (৳)</label>
+          <input type="number" min="0" value={ratePerListing} onChange={(e) => setRatePerListing(e.target.value)}
+            placeholder="যেমনঃ 5" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500" />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-xs text-gray-500">মোট আয়: <span className="font-bold text-red-600">৳ {earned}</span></p>
+        <button onClick={onSave} disabled={saving}
+          className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg disabled:opacity-60">
+          {saving ? 'সেভ হচ্ছে...' : saved ? 'সেভ হয়েছে ✓' : 'সেটিংস সংরক্ষণ করুন'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- WORKER DASHBOARD (product-listing-only access) ---
-function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, handleAddWorkerProduct, handleDeleteWorkerProduct }) {
+function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, handleAddWorkerProduct, handleDeleteWorkerProduct, myWithdrawalRequests, handleRequestWithdrawal }) {
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [image, setImage] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0].name);
+  const [category, setCategory] = useState(workerProfile?.assignedCategory || CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [sizeInput, setSizeInput] = useState('');
   const [sizes, setSizes] = useState([]);
   const [colorNameInput, setColorNameInput] = useState('');
@@ -900,6 +1018,29 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
       const reader = new FileReader();
       reader.onloadend = () => setImage(reader.result);
       reader.readAsDataURL(file);
+    }
+  };
+
+  // --- টার্গেট, আয় ও উত্তোলনের হিসাব (সব admin-এর সেট করা তথ্য থেকে লাইভ হিসাব হয়) ---
+  const listingsDone = myProducts.length;
+  const listingTarget = Number(workerProfile?.listingTarget) || 0;
+  const ratePerListing = Number(workerProfile?.ratePerListing) || 0;
+  const totalEarned = listingsDone * ratePerListing;
+  const paidAmount = myWithdrawalRequests.filter((r) => r.status === 'paid').reduce((s, r) => s + Number(r.amount || 0), 0);
+  const pendingAmount = myWithdrawalRequests.filter((r) => r.status === 'pending').reduce((s, r) => s + Number(r.amount || 0), 0);
+  const availableBalance = Math.max(0, totalEarned - paidAmount - pendingAmount);
+  const hasPendingRequest = myWithdrawalRequests.some((r) => r.status === 'pending');
+  const canWithdraw = availableBalance >= 500 && !hasPendingRequest;
+  const targetPct = listingTarget > 0 ? Math.min(100, Math.round((listingsDone / listingTarget) * 100)) : 0;
+
+  const onWithdraw = async () => {
+    if (!canWithdraw) return;
+    if (!window.confirm(`৳ ${availableBalance} উত্তোলনের অনুরোধ পাঠাতে চান?`)) return;
+    setWithdrawing(true);
+    try {
+      await handleRequestWithdrawal(availableBalance);
+    } finally {
+      setWithdrawing(false);
     }
   };
 
@@ -957,6 +1098,46 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
 
         <main className="flex-1 overflow-y-auto p-8">
           <div className="space-y-8">
+            {/* --- অ্যাডমিনের সেট করা ক্যাটাগরি/টার্গেট/আয়ের লাইভ তথ্য-বক্স --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
+                  <Package className="h-4 w-4" /> অ্যাসাইন করা ক্যাটাগরি
+                </div>
+                <p className="text-lg font-bold text-gray-800">
+                  {workerProfile?.assignedCategory || 'সব ক্যাটাগরি'}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
+                  <ShoppingBag className="h-4 w-4" /> লিস্টিং টার্গেট
+                </div>
+                <p className="text-lg font-bold text-gray-800 mb-2">
+                  {listingsDone} {listingTarget > 0 ? `/ ${listingTarget}` : ''} <span className="text-xs font-normal text-gray-400">টি</span>
+                </p>
+                {listingTarget > 0 && (
+                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-red-600 rounded-full transition-all" style={{ width: `${targetPct}%` }} />
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
+                  <Wallet className="h-4 w-4" /> জমা হওয়া টাকা
+                </div>
+                <p className="text-lg font-bold text-red-600 mb-2">৳ {availableBalance}</p>
+                <button onClick={onWithdraw} disabled={!canWithdraw || withdrawing}
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-bold py-2 rounded-lg transition-colors">
+                  {withdrawing ? 'পাঠানো হচ্ছে...' : hasPendingRequest ? 'অনুরোধ পর্যালোচনাধীন' : 'উত্তোলনের অনুরোধ পাঠান'}
+                </button>
+                {!hasPendingRequest && availableBalance < 500 && (
+                  <p className="text-[10px] text-gray-400 mt-1.5">সর্বনিম্ন ৳৫০০ জমা হলে উত্তোলন করা যাবে।</p>
+                )}
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
               <h3 className="text-lg font-bold mb-4">নতুন প্রোডাক্ট যোগ করুন</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -967,10 +1148,16 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ক্যাটাগরি</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)}
-                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 bg-white">
-                    {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                  </select>
+                  {workerProfile?.assignedCategory ? (
+                    <div className="w-full border rounded-lg p-2.5 bg-gray-100 text-gray-700 text-sm">
+                      {workerProfile.assignedCategory} <span className="text-xs text-gray-400">(অ্যাডমিন কর্তৃক নির্ধারিত)</span>
+                    </div>
+                  ) : (
+                    <select value={category} onChange={(e) => setCategory(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 bg-white">
+                      {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
@@ -1167,6 +1354,24 @@ export default function App() {
     return () => unsub();
   }, [isAdminLoggedIn]);
 
+  // Withdrawal requests — admin sees every request, a worker only sees their own
+  // (mirrors the orders pattern above).
+  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
+  useEffect(() => {
+    if (!authUser) { setWithdrawalRequests([]); return; }
+    let q = null;
+    if (isAdminLoggedIn) {
+      q = query(collection(db, 'withdrawalRequests'), orderBy('createdAt', 'desc'));
+    } else if (isWorkerLoggedIn) {
+      q = query(collection(db, 'withdrawalRequests'), where('workerId', '==', authUser.uid), orderBy('createdAt', 'desc'));
+    }
+    if (!q) { setWithdrawalRequests([]); return; }
+    const unsub = onSnapshot(q, (snapshot) => {
+      setWithdrawalRequests(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [authUser, isAdminLoggedIn, isWorkerLoggedIn]);
+
   // Real-time order feed — must match what the Firestore rules allow each role to read:
   // admin sees every order, a customer only sees orders where customerId == their own uid.
   // (A customer querying the whole collection would be denied outright, since "list" rules
@@ -1323,6 +1528,34 @@ export default function App() {
     await deleteDoc(doc(db, 'products', productId));
   };
 
+  // Admin sets/updates a worker's assigned category, listing target, and per-listing rate.
+  const handleUpdateWorkerSettings = async (workerId, { assignedCategory, listingTarget, ratePerListing }) => {
+    await updateDoc(doc(db, 'workers', workerId), {
+      assignedCategory: assignedCategory || null,
+      listingTarget: listingTarget === '' || listingTarget === null ? null : Number(listingTarget),
+      ratePerListing: ratePerListing === '' || ratePerListing === null ? null : Number(ratePerListing),
+    });
+  };
+
+  // Worker requests to withdraw their currently available balance.
+  const handleRequestWithdrawal = async (amount) => {
+    await addDoc(collection(db, 'withdrawalRequests'), {
+      workerId: authUser.uid,
+      workerName: workerProfile?.name || authUser.email,
+      amount,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+    });
+  };
+
+  // Admin marks a withdrawal request as paid or rejected.
+  const handleProcessWithdrawal = async (requestId, status) => {
+    await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+      status,
+      processedAt: serverTimestamp(),
+    });
+  };
+
   // --- MULTI-ITEM CART (variant-aware: same product with different size/color = separate line) ---
   const handleAddToCart = (product, variant = {}) => {
     const { selectedSize, selectedColor } = variant;
@@ -1410,6 +1643,9 @@ export default function App() {
         workers={workers}
         handleCreateWorker={handleCreateWorker}
         handleDeleteWorker={handleDeleteWorker}
+        handleUpdateWorkerSettings={handleUpdateWorkerSettings}
+        withdrawalRequests={withdrawalRequests}
+        handleProcessWithdrawal={handleProcessWithdrawal}
       />
     );
   }
@@ -1456,6 +1692,8 @@ export default function App() {
         myProducts={products.filter((p) => p.createdBy === authUser.uid)}
         handleAddWorkerProduct={handleAddWorkerProduct}
         handleDeleteWorkerProduct={handleDeleteWorkerProduct}
+        myWithdrawalRequests={withdrawalRequests}
+        handleRequestWithdrawal={handleRequestWithdrawal}
       />
     );
   }
