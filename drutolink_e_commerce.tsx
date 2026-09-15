@@ -25,7 +25,49 @@ const ADMIN_EMAIL = 'admin@drutolink.com';
 const LOGO_URL = 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/logo.png';
 
 // অর্ডারের ধাপগুলো — ঠিক এই ক্রমে, AdminDashboard-এর স্ট্যাটাস ড্রপডাউনের সাথে মিলিয়ে
+// একটা এলিমেন্ট স্ক্রল করে চোখের সামনে এলে true হয়ে যায় — নিচের দিকের সেকশনগুলোকে
+// (যেমন "৩ ধাপে অর্ডার করুন") পেজ লোডের বদলে স্ক্রলে আসার সময় অ্যানিমেট করাতে ব্যবহার হয়।
+function useInView(threshold = 0.25) {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // IntersectionObserver না থাকলে (খুব পুরোনো ব্রাউজার) সরাসরি দেখিয়ে দিই, লুকিয়ে রাখার দরকার নেই
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, inView];
+}
+
 const ORDER_STAGES = ['Pending TrxID', 'Order Placed', 'Sourced in China', 'Delivered'];
+
+// "৩ ধাপে অর্ডার করুন" সেকশনের একেকটা কার্ড। useInView দিয়ে বোঝে কখন স্ক্রল করে
+// চোখের সামনে এসেছে, আর index অনুযায়ী সামান্য দেরি করে একে একে ভেসে ওঠে (স্ট্যাগার ইফেক্ট)।
+function StepCard({ step, index }) {
+  const [ref, inView] = useInView(0.35);
+  return (
+    <div
+      ref={ref}
+      className={`flex gap-4 relative reveal-step ${inView ? 'reveal-step-in' : ''}`}
+      style={{ animationDelay: inView ? `${index * 0.15}s` : undefined }}
+    >
+      <span className="step-badge font-display h-12 w-12 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl font-extrabold text-white">
+        {step.n}
+      </span>
+      <div className="pt-1">
+        <h3 className="font-semibold mb-1">{step.t}</h3>
+        <p className="text-sm text-red-100 leading-relaxed">{step.d}</p>
+      </div>
+      {index < 2 && <div className="hidden md:block absolute top-6 left-[calc(100%-1.25rem)] w-6 border-t border-dashed border-white/30" />}
+    </div>
+  );
+}
 
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
@@ -48,6 +90,8 @@ html { scroll-behavior: smooth; }
 @keyframes floatSlow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes dashMove { to { stroke-dashoffset: -24; } }
 @keyframes catMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes stepPop { 0% { opacity: 0; transform: translateY(22px) scale(0.94); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes stepBadgePulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.45); } 70% { box-shadow: 0 0 0 10px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
 
 .animate-hero-in { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-hero-in-delay { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
@@ -61,10 +105,17 @@ html { scroll-behavior: smooth; }
 .cat-marquee-track { animation: catMarquee 26s linear infinite; }
 .cat-marquee-track:hover, .cat-marquee-track:focus-within { animation-play-state: paused; }
 
+/* "৩ ধাপে অর্ডার করুন" সেকশনের প্রতিটা ধাপ স্ক্রল করে দেখা যাওয়ার আগে অদৃশ্য থাকে (opacity: 0),
+   .reveal-step-in ক্লাস যোগ হলে (useInView হুক দিয়ে) অ্যানিমেট হয়ে ভেসে ওঠে। */
+.reveal-step { opacity: 0; }
+.reveal-step-in { animation: stepPop 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.reveal-step-in .step-badge { animation: stepBadgePulse 1.6s ease-out 0.4s; }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash, .cat-marquee-track {
+  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash, .cat-marquee-track, .reveal-step-in, .reveal-step-in .step-badge {
     animation: none !important;
   }
+  .reveal-step { opacity: 1; }
   html { scroll-behavior: auto; }
 }
 `;
@@ -2229,18 +2280,7 @@ export default function App() {
                   { n: '১', t: 'প্রোডাক্ট বাছাই করুন', d: 'ক্যাটালগ থেকে পছন্দের প্রোডাক্ট ও পরিমাণ বেছে নিন।' },
                   { n: '২', t: 'বিকাশ/নগদে পেমেন্ট করুন', d: 'নির্দিষ্ট নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন।' },
                   { n: '৩', t: 'আমরা সোর্স করে পাঠাই', d: 'চীন থেকে প্রোডাক্ট সংগ্রহ করে আপনার ঠিকানায় ডেলিভারি করি।' },
-                ].map((s, i) => (
-                  <div key={s.n} className="flex gap-4 relative">
-                    <span className="font-display h-12 w-12 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl font-extrabold text-white">
-                      {s.n}
-                    </span>
-                    <div className="pt-1">
-                      <h3 className="font-semibold mb-1">{s.t}</h3>
-                      <p className="text-sm text-red-100 leading-relaxed">{s.d}</p>
-                    </div>
-                    {i < 2 && <div className="hidden md:block absolute top-6 left-[calc(100%-1.25rem)] w-6 border-t border-dashed border-white/30" />}
-                  </div>
-                ))}
+                ].map((s, i) => <StepCard key={s.n} step={s} index={i} />)}
               </div>
             </div>
           </section>
