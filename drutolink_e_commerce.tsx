@@ -3,9 +3,11 @@ import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
-  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil
+  Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
+  Camera, Loader2
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
+import { useVisualSearch } from './visualSearch';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where,
   serverTimestamp, updateDoc, setDoc, getDoc,
@@ -1429,6 +1431,19 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // ছবি দিয়ে প্রোডাক্ট খোঁজা — পুরোটাই ব্রাউজারে চলে, কোনো API লাগে না (visualSearch.ts দেখুন)
+  const visual = useVisualSearch(products);
+  const imageInputRef = useRef(null);
+  const openImageSearch = () => imageInputRef.current?.click();
+  const handleImageSearchPick = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      visual.searchByFile(file);
+      productsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    e.target.value = ''; // একই ছবি আবার দিলেও যেন সার্চ চলে
+  };
+
   // --- AUTH (single Firebase Authentication instance, shared by admin + customers) ---
   const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -1762,9 +1777,18 @@ export default function App() {
   const scrollToProducts = () => productsRef.current?.scrollIntoView({ behavior: 'smooth' });
   const scrollToHowItWorks = () => howItWorksRef.current?.scrollIntoView({ behavior: 'smooth' });
 
-  const visibleProducts = products
-    .filter((p) => !selectedCategory || p.category === selectedCategory)
-    .filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+  // ছবি-সার্চ চালু থাকলে সেটাই অগ্রাধিকার পায় — মিলের ক্রমে সাজানো ফল দেখায়।
+  // তখন লেখা-সার্চ ও ক্যাটাগরি ফিল্টার বাদ থাকে, নইলে ফল প্রায় সবসময় খালি আসত।
+  const visibleProducts = visual.active
+    ? (visual.matches || [])
+        .map((m) => {
+          const p = products.find((x) => x.id === m.id);
+          return p ? { ...p, _matchScore: m.score } : null;
+        })
+        .filter(Boolean)
+    : products
+        .filter((p) => !selectedCategory || p.category === selectedCategory)
+        .filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (!authChecked && currentView === 'admin') {
     return <div className="min-h-screen flex items-center justify-center text-gray-500 font-body">লোড হচ্ছে...</div>;
@@ -1961,6 +1985,9 @@ export default function App() {
     <div className="min-h-screen bg-white font-body text-gray-900">
       <style>{FONTS}</style>
 
+      {/* ছবি সার্চের লুকানো ফাইল ইনপুট — capture থাকায় মোবাইলে সরাসরি ক্যামেরাও খোলা যায় */}
+      <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSearchPick} className="hidden" />
+
       {/* Header */}
       <header className="bg-red-700 text-white sticky top-0 z-40 shadow-md shadow-red-900/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
@@ -1973,7 +2000,12 @@ export default function App() {
           </div>
           <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="hidden md:flex flex-1 max-w-xl relative">
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2.5 pl-4 pr-11 text-gray-900 bg-white outline-none ring-0 focus:ring-2 focus:ring-red-300 transition-shadow duration-150" />
+              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2.5 pl-4 pr-20 text-gray-900 bg-white outline-none ring-0 focus:ring-2 focus:ring-red-300 transition-shadow duration-150" />
+            {/* ছবি দিয়ে সার্চ — ক্যামেরা আইকন */}
+            <button type="button" onClick={openImageSearch} title="ছবি দিয়ে খুঁজুন"
+              className="absolute right-11 top-1.5 text-gray-400 hover:text-red-600 p-1.5 rounded-full transition-colors duration-150">
+              {visual.searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </button>
             <button type="submit" className="absolute right-1.5 top-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full transition-all duration-150 hover:scale-105">
               <Search className="h-4 w-4" />
             </button>
@@ -2206,21 +2238,63 @@ export default function App() {
 
           {/* Product grid */}
           <section ref={productsRef} className="max-w-6xl mx-auto px-4 py-12">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="font-display text-xl font-bold text-gray-900">
-                {selectedCategory ? selectedCategory : 'জনপ্রিয় পণ্য'}
+                {visual.active ? 'ছবির সাথে মিলে যাওয়া পণ্য' : (selectedCategory ? selectedCategory : 'জনপ্রিয় পণ্য')}
               </h2>
+              {/* মোবাইলেও যেন ছবি-সার্চ হাতের কাছে থাকে (হেডারের সার্চ বার শুধু বড় স্ক্রিনে দেখায়) */}
+              <button onClick={openImageSearch} disabled={visual.searching}
+                className="flex items-center gap-1.5 text-sm font-semibold text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors disabled:opacity-60">
+                {visual.searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                ছবি দিয়ে খুঁজুন
+              </button>
             </div>
+
+            {/* ছবি-সার্চ চালু থাকলে উপরে কোন ছবি দিয়ে খোঁজা হচ্ছে সেটা দেখাই */}
+            {visual.active && (
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3 mb-5">
+                {visual.queryImage && (
+                  <img src={visual.queryImage} alt="সার্চ করা ছবি" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">
+                    {visual.searching ? 'মিলিয়ে দেখা হচ্ছে...' : `${visibleProducts.length} টি মিল পাওয়া গেছে`}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">আপনার দেওয়া ছবির রঙ ও গড়নের সাথে সবচেয়ে কাছাকাছি পণ্যগুলো উপরে।</p>
+                </div>
+                <button onClick={visual.clear} className="text-gray-400 hover:text-red-600 p-1.5 rounded-full transition-colors" title="ছবি সার্চ বাতিল">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            )}
+
+            {visual.error && (
+              <p className="text-sm text-red-600 mb-4">{visual.error}</p>
+            )}
+
             {visibleProducts.length === 0 ? (
-              <p className="text-gray-500 text-sm">কোনো প্রোডাক্ট পাওয়া যায়নি। {products.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</p>
+              visual.active ? (
+                <div className="text-sm text-gray-500">
+                  <p className="mb-2">এই ছবির সাথে মিলে এমন পণ্য ক্যাটালগে পাওয়া যায়নি।</p>
+                  <p className="text-gray-400">পরিষ্কার ব্যাকগ্রাউন্ডে তোলা ছবি দিলে ভালো ফল আসে। অথবা পণ্যের নাম লিখে খুঁজে দেখুন — না পেলে আমরা চীন থেকে সোর্স করে দিতে পারি।</p>
+                  <button onClick={visual.clear} className="mt-3 text-red-700 font-semibold underline underline-offset-2">সব পণ্য দেখুন</button>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">কোনো প্রোডাক্ট পাওয়া যায়নি। {products.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</p>
+              )
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
                 {visibleProducts.map((p) => {
                   const hasVariants = (p.sizes && p.sizes.length > 0) || (p.colors && p.colors.length > 0);
                   return (
                     <div key={p.id} className="group bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/70 hover:-translate-y-1 hover:border-gray-300">
-                      <button onClick={() => setDetailProduct(p)} className="block overflow-hidden">
+                      <button onClick={() => setDetailProduct(p)} className="block overflow-hidden relative w-full">
                         <img src={p.image} alt={p.title} className="h-40 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
+                        {p._matchScore != null && (
+                          <span className="absolute top-2 left-2 bg-black/65 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                            {Math.round(p._matchScore * 100)}% মিল
+                          </span>
+                        )}
                       </button>
                       <div className="p-3.5 flex flex-col flex-1">
                         <button onClick={() => setDetailProduct(p)} className="text-left">
