@@ -29,6 +29,36 @@ const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
 .font-display { font-family: 'Baloo Da 2', 'Hind Siliguri', sans-serif; }
 .font-body { font-family: 'Hind Siliguri', sans-serif; }
+
+html { scroll-behavior: smooth; }
+* { -webkit-tap-highlight-color: transparent; }
+::selection { background: #fecaca; color: #7f1d1d; }
+
+/* thin, quiet scrollbars for drawers/modals */
+.thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 999px; }
+.thin-scroll::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes floatSlow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes dashMove { to { stroke-dashoffset: -24; } }
+
+.animate-hero-in { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-hero-in-delay { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out both; }
+.animate-scale-in { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-float { animation: floatSlow 5s ease-in-out infinite; }
+.route-dash { stroke-dasharray: 6 6; animation: dashMove 1.2s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash {
+    animation: none !important;
+  }
+  html { scroll-behavior: auto; }
+}
 `;
 
 const CATEGORIES = [
@@ -66,7 +96,7 @@ function ImageSlider() {
   };
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200">
+    <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
       <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${active * 100}%)` }}>
         {SLIDES.map((s, i) => (
           <div key={i} className="min-w-full relative h-48 md:h-72">
@@ -75,17 +105,17 @@ function ImageSlider() {
         ))}
       </div>
       <button onClick={() => goTo((active - 1 + SLIDES.length) % SLIDES.length)}
-        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-900 rounded-full p-1.5">
+        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-900 rounded-full p-1.5 shadow-sm transition-all duration-150 hover:scale-105">
         <ChevronLeft className="h-5 w-5" />
       </button>
       <button onClick={() => goTo((active + 1) % SLIDES.length)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-900 rounded-full p-1.5">
+        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-900 rounded-full p-1.5 shadow-sm transition-all duration-150 hover:scale-105">
         <ChevronRight className="h-5 w-5" />
       </button>
       <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
         {SLIDES.map((_, i) => (
           <button key={i} onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-all ${i === active ? 'w-6 bg-red-600' : 'w-2 bg-white/70'}`} />
+            className={`h-2 rounded-full transition-all duration-300 ${i === active ? 'w-6 bg-red-600' : 'w-2 bg-white/70 hover:bg-white/90'}`} />
         ))}
       </div>
     </div>
@@ -95,7 +125,7 @@ function ImageSlider() {
 function RouteGraphic() {
   return (
     <svg viewBox="0 0 400 220" className="w-full h-auto">
-      <path d="M 40 170 Q 200 20 360 60" fill="none" stroke="#dc2626" strokeWidth="2" strokeDasharray="6 6" opacity="0.6" />
+      <path d="M 40 170 Q 200 20 360 60" fill="none" stroke="#dc2626" strokeWidth="2" className="route-dash" opacity="0.6" />
       <circle cx="40" cy="170" r="7" fill="#111827" />
       <text x="40" y="196" textAnchor="middle" className="font-body" fontSize="14" fill="#111827">চীন</text>
       <circle cx="360" cy="60" r="7" fill="#dc2626" />
@@ -121,7 +151,7 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
       <div
         onClick={onClose}
         aria-hidden="true"
-        className={`fixed inset-0 bg-black/40 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       />
       {/* Slide-in panel */}
       <div
@@ -129,23 +159,29 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
         aria-label="কার্ট"
         className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col font-body transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <h3 className="font-display text-lg font-bold text-gray-900 flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-red-600" /> আপনার কার্ট ({cartCount})
+            <ShoppingCart className="h-5 w-5 text-red-600" /> আপনার কার্ট
+            {cartCount > 0 && (
+              <span className="text-xs font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded-full">{cartCount}</span>
+            )}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+        <div className="flex-1 overflow-y-auto thin-scroll divide-y divide-gray-100">
           {cart.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 text-sm">
-              আপনার কার্ট খালি। প্রোডাক্ট বেছে "কার্টে যোগ করুন" চাপুন।
+            <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
+              <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center">
+                <ShoppingCart className="h-7 w-7 text-gray-300" />
+              </div>
+              <p className="text-gray-500 text-sm max-w-[220px]">আপনার কার্ট খালি। প্রোডাক্ট বেছে "কার্টে যোগ করুন" চাপুন।</p>
             </div>
           ) : (
             cart.map((item) => (
-              <div key={item.cartLineId} className="p-4 flex items-center gap-3">
+              <div key={item.cartLineId} className="p-4 flex items-center gap-3 hover:bg-gray-50/60 transition-colors">
                 <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded-lg border border-gray-100 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-semibold text-gray-800 truncate">{item.title}</h4>
@@ -157,17 +193,17 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
                     </p>
                   )}
                   <p className="text-red-600 font-bold text-sm mt-0.5">৳ {item.price}</p>
-                  <div className="flex items-center border rounded-lg mt-2 w-fit">
-                    <button onClick={() => onUpdateQuantity(item.cartLineId, -1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
+                  <div className="flex items-center border border-gray-200 rounded-lg mt-2 w-fit overflow-hidden">
+                    <button onClick={() => onUpdateQuantity(item.cartLineId, -1)} className="p-1.5 text-gray-600 hover:bg-gray-100 transition-colors">
                       <Minus className="h-3 w-3" />
                     </button>
-                    <span className="px-3 text-xs font-semibold">{item.quantity}</span>
-                    <button onClick={() => onUpdateQuantity(item.cartLineId, 1)} className="p-1.5 text-gray-600 hover:bg-gray-50">
+                    <span className="px-3 text-xs font-semibold tabular-nums">{item.quantity}</span>
+                    <button onClick={() => onUpdateQuantity(item.cartLineId, 1)} className="p-1.5 text-gray-600 hover:bg-gray-100 transition-colors">
                       <Plus className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
-                <button onClick={() => onRemove(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1 shrink-0">
+                <button onClick={() => onRemove(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1 shrink-0 transition-colors">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -176,15 +212,15 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
         </div>
 
         {cart.length > 0 && (
-          <div className="border-t border-gray-200 p-5 space-y-3 shrink-0">
+          <div className="border-t border-gray-100 p-5 space-y-3 shrink-0 bg-gray-50/50">
             <div className="flex items-center justify-between">
               <span className="font-bold text-gray-700">সর্বমোট</span>
               <span className="font-display text-red-700 font-bold text-lg">৳ {cartTotal}</span>
             </div>
-            <button onClick={onCheckout} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors">
+            <button onClick={onCheckout} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98]">
               চেকআউটে যান
             </button>
-            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-800 py-1">
+            <button onClick={onClose} className="w-full text-sm text-gray-500 hover:text-gray-800 py-1 transition-colors">
               কেনাকাটা চালিয়ে যান
             </button>
           </div>
@@ -219,24 +255,24 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-body">
-      <div onClick={onClose} className="absolute inset-0 bg-black/50" />
-      <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <button onClick={onClose} className="absolute top-3 right-3 bg-white/90 hover:bg-white rounded-full p-1.5 shadow z-10">
+      <div onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-fade-in" />
+      <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto thin-scroll shadow-2xl animate-scale-in">
+        <button onClick={onClose} className="absolute top-3 right-3 bg-white/90 hover:bg-white rounded-full p-1.5 shadow-md z-10 transition-transform hover:scale-105">
           <X className="h-5 w-5 text-gray-700" />
         </button>
         <img src={product.image} alt={product.title} className="w-full h-56 object-cover rounded-t-2xl" />
-        <div className="p-5">
-          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{product.category}</span>
-          <h3 className="font-display text-xl font-bold text-gray-900 mt-2">{product.title}</h3>
-          <p className="text-red-600 font-bold text-lg mt-1">৳ {product.price}</p>
+        <div className="p-5 md:p-6">
+          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-full">{product.category}</span>
+          <h3 className="font-display text-xl font-bold text-gray-900 mt-3 leading-snug">{product.title}</h3>
+          <p className="text-red-600 font-bold text-xl mt-1.5">৳ {product.price}</p>
 
           {hasSizes && (
-            <div className="mt-4">
+            <div className="mt-5">
               <p className="text-sm font-semibold text-gray-700 mb-2">সাইজ বাছাই করুন</p>
               <div className="flex flex-wrap gap-2">
                 {product.sizes.map((s) => (
                   <button key={s} onClick={() => setSelectedSize(s)}
-                    className={`px-3.5 py-1.5 rounded-lg border text-sm font-semibold ${selectedSize === s ? 'border-red-600 bg-red-50 text-red-700' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
+                    className={`px-3.5 py-1.5 rounded-lg border text-sm font-semibold transition-all ${selectedSize === s ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
                     {s}
                   </button>
                 ))}
@@ -245,12 +281,12 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
           )}
 
           {hasColors && (
-            <div className="mt-4">
+            <div className="mt-5">
               <p className="text-sm font-semibold text-gray-700 mb-2">কালার বাছাই করুন</p>
               <div className="flex flex-wrap gap-2">
                 {product.colors.map((c) => (
                   <button key={c.name} onClick={() => setSelectedColor(c.name)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
                     <span className="h-4 w-4 rounded-full border border-gray-300" style={{ backgroundColor: c.hex || '#ccc' }} />
                     {c.name}
                   </button>
@@ -260,7 +296,7 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
           )}
 
           <button onClick={handleAdd}
-            className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors">
+            className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98]">
             কার্টে যোগ করুন
           </button>
         </div>
@@ -280,9 +316,9 @@ function OrderStatusTimeline({ status }) {
         return (
           <React.Fragment key={stage}>
             <div className="flex flex-col items-center text-center w-20">
-              <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+              <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors duration-300 ${
                 done ? 'bg-red-600 border-red-600 text-white'
-                : active ? 'border-red-600 text-red-600 bg-red-50'
+                : active ? 'border-red-600 text-red-600 bg-red-50 ring-4 ring-red-50'
                 : 'border-gray-300 text-gray-300 bg-white'
               }`}>
                 {done ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-3 w-3 fill-current" />}
@@ -292,7 +328,7 @@ function OrderStatusTimeline({ status }) {
               </span>
             </div>
             {i < ORDER_STAGES.length - 1 && (
-              <div className={`flex-1 h-0.5 -mt-5 ${i < currentIndex ? 'bg-red-600' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-0.5 -mt-5 transition-colors duration-500 ${i < currentIndex ? 'bg-red-600' : 'bg-gray-200'}`} />
             )}
           </React.Fragment>
         );
@@ -324,9 +360,9 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 
   return (
     <div className="min-h-screen bg-gray-50 font-body flex items-center justify-center px-4 py-10">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-sm border border-gray-100 p-8">
-        <div className="flex items-center gap-2 justify-center mb-1 cursor-pointer" onClick={goHome}>
-          <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg" />
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-lg shadow-gray-200/60 border border-gray-100 p-8 animate-scale-in">
+        <div className="flex items-center gap-2 justify-center mb-1 cursor-pointer group" onClick={goHome}>
+          <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg transition-transform duration-200 group-hover:scale-105" />
           <span className="font-display text-2xl font-extrabold tracking-tight text-red-700">
             Druto<span className="font-medium text-gray-700">Link</span>
           </span>
@@ -338,7 +374,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 
         <div className="mt-6 space-y-3">
           <button type="button" onClick={() => onGoogleLogin()} disabled={authLoading}
-            className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+            className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-60">
             <svg className="h-4 w-4" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6 29.5 4 24 4c-7.5 0-14 4.2-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-1.8 14.1-5l-6.5-5.5C29.5 35.4 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8l-6.6 5C9.9 39.7 16.4 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.5 5.5C40.8 36.3 44 30.8 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
             Sign in with Google
           </button>
@@ -356,7 +392,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
               <label className="text-sm font-medium text-gray-700">আপনার নাম</label>
               <input type="text" required value={name} onChange={(e) => setName(e.target.value)}
                 placeholder="পুরো নাম লিখুন"
-                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
             </div>
           )}
 
@@ -378,7 +414,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Email Address</label>
               <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
             </div>
           )}
 
@@ -387,7 +423,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><PhoneIcon className="h-3.5 w-3.5" /> Phone Number</label>
               <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
                 placeholder="01xxxxxxxxx"
-                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
               <p className="text-[11px] text-amber-600 mt-1">ফোন নম্বর দিয়ে লগইন এখনো চালু হয়নি — আপাতত ইমেইল ব্যবহার করুন।</p>
             </div>
           )}
@@ -397,7 +433,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
               <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><PhoneIcon className="h-3.5 w-3.5" /> ফোন নম্বর</label>
               <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
                 placeholder="01xxxxxxxxx"
-                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500" />
+                className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
             </div>
           )}
 
@@ -406,7 +442,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
             <div className="relative mt-1">
               <input type={showPassword ? 'text' : 'password'} required minLength={6} value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg p-2.5 pr-10 outline-none focus:border-red-500" />
+                className="w-full border border-gray-200 rounded-lg p-2.5 pr-10 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
               <button type="button" onClick={() => setShowPassword((s) => !s)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -426,20 +462,20 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
           {authError && <p className="text-red-600 text-xs">{authError}</p>}
 
           <button type="submit" disabled={authLoading}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl disabled:opacity-60">
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100">
             {authLoading ? 'অপেক্ষা করুন...' : isSignup ? 'Sign up' : 'Sign in'}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-5">
           {isSignup ? (
-            <>Already have an account? <button onClick={() => setMode('login')} className="text-red-700 font-semibold">Sign in</button></>
+            <>Already have an account? <button onClick={() => setMode('login')} className="text-red-700 font-semibold hover:underline">Sign in</button></>
           ) : (
-            <>New here? <button onClick={() => setMode('signup')} className="text-red-700 font-semibold">Sign up</button></>
+            <>New here? <button onClick={() => setMode('signup')} className="text-red-700 font-semibold hover:underline">Sign up</button></>
           )}
         </p>
 
-        <button onClick={goHome} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4">
+        <button onClick={goHome} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 mt-4 transition-colors">
           স্টোরে ফিরে যান
         </button>
       </div>
@@ -597,7 +633,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
-      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-red-700 text-white flex flex-col transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-red-700 text-white flex flex-col shadow-xl shadow-red-900/20 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="p-6 flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -607,20 +643,20 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
               </h1>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-red-100 hover:text-white p-1">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-red-100 hover:text-white p-1 transition-colors">
             <X className="h-6 w-6" />
           </button>
         </div>
         <nav className="flex-1 px-4 space-y-2">
-          <button onClick={() => { setActiveTab('orders'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+          <button onClick={() => { setActiveTab('orders'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 ${activeTab === 'orders' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:bg-red-800'}`}>
             <ShoppingBag className="h-5 w-5" />
             <span>অর্ডার ও TrxID ({orders.length})</span>
           </button>
-          <button onClick={() => { setActiveTab('products'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+          <button onClick={() => { setActiveTab('products'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 ${activeTab === 'products' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:bg-red-800'}`}>
             <Package className="h-5 w-5" />
             <span>প্রোডাক্ট ({products.length})</span>
           </button>
-          <button onClick={() => { setActiveTab('workers'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'workers' ? 'bg-white text-red-700' : 'text-red-100 hover:bg-red-800'}`}>
+          <button onClick={() => { setActiveTab('workers'); setSidebarOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-150 ${activeTab === 'workers' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:bg-red-800'}`}>
             <Users className="h-5 w-5" />
             <span>কর্মী ({workers.length})</span>
           </button>
@@ -650,9 +686,9 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
           <span className="hidden sm:inline text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full shrink-0">নিরাপদভাবে লগ ইন করা আছে</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+        <main className="flex-1 overflow-y-auto thin-scroll p-4 sm:p-8">
           {activeTab === 'orders' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
               <h3 className="text-lg font-bold mb-4">সাম্প্রতিক অর্ডার (ম্যানুয়াল যাচাই)</h3>
               {orders.length === 0 ? (
                 <p className="text-gray-500 text-sm">এখনো কোনো অর্ডার আসেনি।</p>
@@ -719,25 +755,25 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
 
           {activeTab === 'products' && (
             <div className="space-y-8">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6 max-w-2xl">
                 <h3 className="text-lg font-bold mb-4">{editingProductId ? 'প্রোডাক্ট এডিট করুন' : 'নতুন পাইকারি প্রোডাক্ট যোগ করুন'}</h3>
                 <form onSubmit={handleAddProduct} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">প্রোডাক্টের নাম</label>
                     <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="যেমনঃ পুতিয়ান স্পোর্টস জুতা" />
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ পুতিয়ান স্পোর্টস জুতা" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">ক্যাটাগরি</label>
                     <select value={category} onChange={(e) => setCategory(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 bg-white">
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150 bg-white">
                       {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
                     <input type="number" value={price} onChange={(e) => setPrice(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="2500" />
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="2500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
@@ -762,7 +798,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       <input type="text" value={sizeInput}
                         onChange={(e) => setSizeInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSize(); } }}
-                        placeholder="যেমনঃ 26" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                        placeholder="যেমনঃ 26" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
                       <button type="button" onClick={handleAddSize}
                         className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
                     </div>
@@ -786,7 +822,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       <input type="text" value={colorNameInput}
                         onChange={(e) => setColorNameInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColor(); } }}
-                        placeholder="যেমনঃ লাল" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                        placeholder="যেমনঃ লাল" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
                       <button type="button" onClick={handleAddColor}
                         className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
                     </div>
@@ -817,7 +853,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 </form>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
                 <h3 className="text-lg font-bold mb-4">চালু ক্যাটালগ ({products.length} টি)</h3>
                 {products.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো প্রোডাক্ট যোগ করা হয়নি।</p>
@@ -858,7 +894,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
 
           {activeTab === 'workers' && (
             <div className="space-y-8">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-xl">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6 max-w-xl">
                 <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
                   <UserPlus className="h-5 w-5 text-red-600" /> নতুন কর্মী অ্যাকাউন্ট তৈরি করুন
                 </h3>
@@ -867,17 +903,17 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">কর্মীর নাম</label>
                     <input type="text" value={workerName} onChange={(e) => setWorkerName(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="যেমনঃ রহিম উদ্দিন" />
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ রহিম উদ্দিন" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">ইমেইল (লগইন আইডি)</label>
                     <input type="email" value={workerEmail} onChange={(e) => setWorkerEmail(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="worker1@drutolink.com" />
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="worker1@drutolink.com" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড</label>
                     <input type="text" value={workerPassword} onChange={(e) => setWorkerPassword(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="কমপক্ষে ৬ ক্যারেক্টার" />
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="কমপক্ষে ৬ ক্যারেক্টার" />
                   </div>
                   {workerFormError && <p className="text-red-600 text-xs">{workerFormError}</p>}
                   <button type="submit" disabled={workerSaving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
@@ -886,7 +922,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 </form>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
                 <h3 className="text-lg font-bold mb-4">কর্মী তালিকা, টার্গেট ও পেমেন্ট সেটিংস ({workers.length} জন)</h3>
                 {workers.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো কর্মী অ্যাকাউন্ট তৈরি করা হয়নি।</p>
@@ -905,7 +941,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 )}
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
                 <h3 className="text-lg font-bold mb-4">
                   পেমেন্ট / উত্তোলনের অনুরোধ
                   {withdrawalRequests.filter((r) => r.status === 'pending').length > 0 && (
@@ -993,7 +1029,7 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
   };
 
   return (
-    <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
+    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3 transition-shadow duration-200 hover:shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">
@@ -1009,7 +1045,7 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
             <p className="text-xl font-bold text-red-600 leading-none">{productCount}</p>
             <p className="text-[10px] text-gray-400">টি লিস্টিং</p>
           </div>
-          <button onClick={() => onDeleteWorker(worker.id)} className="text-red-500 hover:text-red-700 p-1" title="কর্মী প্রোফাইল মুছুন">
+          <button onClick={() => onDeleteWorker(worker.id)} className="text-red-500 hover:text-red-700 p-1 transition-colors" title="কর্মী প্রোফাইল মুছুন">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -1019,7 +1055,7 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
         <div className="col-span-2">
           <label className="block text-[11px] font-medium text-gray-600 mb-1">অ্যাসাইন করা ক্যাটাগরি</label>
           <select value={assignedCategory} onChange={(e) => setAssignedCategory(e.target.value)}
-            className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 bg-white">
+            className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150 bg-white">
             <option value="">সব ক্যাটাগরি (নির্দিষ্ট নয়)</option>
             {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
           </select>
@@ -1027,19 +1063,19 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
         <div>
           <label className="block text-[11px] font-medium text-gray-600 mb-1">লিস্টিং টার্গেট</label>
           <input type="number" min="0" value={listingTarget} onChange={(e) => setListingTarget(e.target.value)}
-            placeholder="যেমনঃ 100" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500" />
+            placeholder="যেমনঃ 100" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
         </div>
         <div>
           <label className="block text-[11px] font-medium text-gray-600 mb-1">প্রতি লিস্টিং রেট (৳)</label>
           <input type="number" min="0" value={ratePerListing} onChange={(e) => setRatePerListing(e.target.value)}
-            placeholder="যেমনঃ 5" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500" />
+            placeholder="যেমনঃ 5" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
         </div>
       </div>
 
       <div className="flex items-center justify-between pt-1">
         <p className="text-xs text-gray-500">মোট আয়: <span className="font-bold text-red-600">৳ {earned}</span></p>
         <button onClick={onSave} disabled={saving}
-          className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg disabled:opacity-60">
+          className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all duration-150 active:scale-95 disabled:opacity-60 disabled:active:scale-100">
           {saving ? 'সেভ হচ্ছে...' : saved ? 'সেভ হয়েছে ✓' : 'সেটিংস সংরক্ষণ করুন'}
         </button>
       </div>
@@ -1137,7 +1173,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
-      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-red-700 text-white flex flex-col transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-red-700 text-white flex flex-col shadow-xl shadow-red-900/20 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="p-6 flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -1148,12 +1184,12 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
             </div>
             <p className="text-xs text-red-100 mt-1">{workerProfile?.name || workerProfile?.email}</p>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-red-100 hover:text-white p-1">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-red-100 hover:text-white p-1 transition-colors">
             <X className="h-6 w-6" />
           </button>
         </div>
         <nav className="flex-1 px-4 space-y-2">
-          <div className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-white text-red-700">
+          <div className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-white text-red-700 shadow-sm">
             <Package className="h-5 w-5" />
             <span>আমার প্রোডাক্ট ({myProducts.length})</span>
           </div>
@@ -1181,11 +1217,11 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
           <span className="hidden sm:inline text-xs bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full shrink-0">কর্মী হিসেবে লগ ইন করা আছে</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+        <main className="flex-1 overflow-y-auto thin-scroll p-4 sm:p-8">
           <div className="space-y-8">
             {/* --- অ্যাডমিনের সেট করা ক্যাটাগরি/টার্গেট/আয়ের লাইভ তথ্য-বক্স --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
                 <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
                   <Package className="h-4 w-4" /> অ্যাসাইন করা ক্যাটাগরি
                 </div>
@@ -1194,7 +1230,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
                 <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
                   <ShoppingBag className="h-4 w-4" /> লিস্টিং টার্গেট
                 </div>
@@ -1208,7 +1244,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                 )}
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
                 <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
                   <Wallet className="h-4 w-4" /> জমা হওয়া টাকা
                 </div>
@@ -1223,13 +1259,13 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-2xl">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6 max-w-2xl">
               <h3 className="text-lg font-bold mb-4">নতুন প্রোডাক্ট যোগ করুন</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">প্রোডাক্টের নাম</label>
                   <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="যেমনঃ পুতিয়ান স্পোর্টস জুতা" />
+                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ পুতিয়ান স্পোর্টস জুতা" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ক্যাটাগরি</label>
@@ -1239,7 +1275,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                     </div>
                   ) : (
                     <select value={category} onChange={(e) => setCategory(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 bg-white">
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150 bg-white">
                       {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
                     </select>
                   )}
@@ -1247,7 +1283,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
                   <input type="number" value={price} onChange={(e) => setPrice(e.target.value)}
-                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500" placeholder="2500" />
+                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="2500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
@@ -1272,7 +1308,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                     <input type="text" value={sizeInput}
                       onChange={(e) => setSizeInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSize(); } }}
-                      placeholder="যেমনঃ 26" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                      placeholder="যেমনঃ 26" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
                     <button type="button" onClick={handleAddSize}
                       className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
                   </div>
@@ -1296,7 +1332,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                     <input type="text" value={colorNameInput}
                       onChange={(e) => setColorNameInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColor(); } }}
-                      placeholder="যেমনঃ লাল" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500" />
+                      placeholder="যেমনঃ লাল" className="flex-1 border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
                     <button type="button" onClick={handleAddColor}
                       className="bg-gray-800 hover:bg-gray-900 text-white px-4 rounded-lg text-sm font-semibold">যোগ করুন</button>
                   </div>
@@ -1319,7 +1355,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
               </form>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
               <h3 className="text-lg font-bold mb-4">আমার লিস্ট করা প্রোডাক্ট ({myProducts.length} টি)</h3>
               {myProducts.length === 0 ? (
                 <p className="text-gray-500 text-sm">আপনি এখনো কোনো প্রোডাক্ট যোগ করেননি।</p>
@@ -1768,7 +1804,7 @@ export default function App() {
                 className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
             </div>
             {loginError && <p className="text-red-500 text-xs text-left">ভুল পাসওয়ার্ড। প্রবেশ করা যায়নি।</p>}
-            <button type="submit" disabled={loggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-60">
+            <button type="submit" disabled={loggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100">
               {loggingIn ? 'যাচাই হচ্ছে...' : 'আনলক করুন'}
             </button>
           </form>
@@ -1827,7 +1863,7 @@ export default function App() {
                 className="w-full border border-gray-300 rounded-lg py-3 px-4 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
             </div>
             {workerLoginError && <p className="text-red-500 text-xs">{workerLoginError}</p>}
-            <button type="submit" disabled={workerLoggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-60">
+            <button type="submit" disabled={workerLoggingIn} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100">
               {workerLoggingIn ? 'যাচাই হচ্ছে...' : 'লগইন করুন'}
             </button>
           </form>
@@ -1870,7 +1906,7 @@ export default function App() {
         </header>
 
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 flex items-center gap-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6 mb-6 flex items-center gap-4">
             <div className="h-14 w-14 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-xl">
               {(customerProfile?.name || authUser.email || '?')[0].toUpperCase()}
             </div>
@@ -1887,7 +1923,7 @@ export default function App() {
           ) : (
             <div className="space-y-4">
               {myOrders.map((o) => (
-                <div key={o.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div key={o.id} className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       {(o.items || []).map((it, idx) => (
@@ -1926,51 +1962,53 @@ export default function App() {
       <style>{FONTS}</style>
 
       {/* Header */}
-      <header className="bg-red-700 text-white sticky top-0 z-40">
+      <header className="bg-red-700 text-white sticky top-0 z-40 shadow-md shadow-red-900/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('home')}>
+          <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setCurrentView('home')}>
             <Menu className="h-6 w-6 lg:hidden" />
-            <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg" />
+            <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg transition-transform duration-200 group-hover:scale-105" />
             <span className="font-display text-2xl font-extrabold tracking-tight text-white">
               Druto<span className="font-medium text-red-100">Link</span>
             </span>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="hidden md:flex flex-1 max-w-xl relative">
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2 pl-4 pr-11 text-gray-900 bg-white outline-none" />
-            <button type="submit" className="absolute right-1.5 top-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full">
+              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2.5 pl-4 pr-11 text-gray-900 bg-white outline-none ring-0 focus:ring-2 focus:ring-red-300 transition-shadow duration-150" />
+            <button type="submit" className="absolute right-1.5 top-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-full transition-all duration-150 hover:scale-105">
               <Search className="h-4 w-4" />
             </button>
           </form>
           <div className="flex items-center gap-5 text-sm">
             {isCustomerLoggedIn ? (
-              <div onClick={() => setCurrentView('account')} className="flex flex-col items-center cursor-pointer">
+              <div onClick={() => setCurrentView('account')} className="flex flex-col items-center cursor-pointer transition-opacity hover:opacity-80">
                 <User className="h-5 w-5" />
                 <span className="text-xs mt-0.5">{customerProfile?.name?.split(' ')[0] || 'অ্যাকাউন্ট'}</span>
               </div>
             ) : (
-              <div onClick={() => { setRedirectAfterLogin('home'); setCurrentView('login'); }} className="flex flex-col items-center cursor-pointer">
+              <div onClick={() => { setRedirectAfterLogin('home'); setCurrentView('login'); }} className="flex flex-col items-center cursor-pointer transition-opacity hover:opacity-80">
                 <User className="h-5 w-5" />
                 <span className="text-xs mt-0.5">লগ ইন</span>
               </div>
             )}
-            <div onClick={() => setIsCartOpen(true)} className="flex flex-col items-center cursor-pointer relative">
+            <div onClick={() => setIsCartOpen(true)} className="flex flex-col items-center cursor-pointer relative transition-opacity hover:opacity-80">
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-scale-in">{cartCount}</span>
+              )}
               <span className="text-xs mt-0.5">কার্ট</span>
             </div>
             {/* কর্মী/অ্যাডমিন প্রবেশ — sticky হেডারে থাকায় পণ্য যতই বাড়ুক, স্ক্রল না করেই সবসময় হাতের কাছে থাকবে */}
             <div className="relative">
-              <div onClick={() => setStaffMenuOpen((v) => !v)} className="flex flex-col items-center cursor-pointer opacity-70 hover:opacity-100">
+              <div onClick={() => setStaffMenuOpen((v) => !v)} className="flex flex-col items-center cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
                 <Lock className="h-5 w-5" />
                 <span className="text-xs mt-0.5">স্টাফ</span>
               </div>
               {staffMenuOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white text-gray-800 rounded-lg shadow-lg overflow-hidden z-50 text-sm">
+                <div className="absolute right-0 mt-2 w-40 bg-white text-gray-800 rounded-lg shadow-lg overflow-hidden z-50 text-sm animate-scale-in origin-top-right">
                   <button onClick={() => { setStaffMenuOpen(false); setCurrentView('worker'); }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-red-50">কর্মী লগইন</button>
+                    className="w-full text-left px-4 py-2.5 hover:bg-red-50 transition-colors">কর্মী লগইন</button>
                   <button onClick={() => { setStaffMenuOpen(false); setCurrentView('admin'); }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-red-50 border-t border-gray-100">অ্যাডমিন প্যানেল</button>
+                    className="w-full text-left px-4 py-2.5 hover:bg-red-50 border-t border-gray-100 transition-colors">অ্যাডমিন প্যানেল</button>
                 </div>
               )}
             </div>
@@ -1996,7 +2034,7 @@ export default function App() {
 
       {currentView === 'checkout' ? (
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <button onClick={() => setCurrentView('home')} className="flex items-center text-sm text-gray-600 mb-4 hover:text-red-600">
+          <button onClick={() => setCurrentView('home')} className="flex items-center text-sm text-gray-600 mb-4 hover:text-red-600 transition-colors">
             <ArrowLeft className="h-4 w-4 mr-1" /> কেনাকাটা চালিয়ে যান
           </button>
           <h2 className="text-2xl font-bold mb-3">চেকআউট ও লোকাল পেমেন্ট</h2>
@@ -2017,7 +2055,7 @@ export default function App() {
           {cart.length === 0 ? (
             <p className="text-gray-500 text-sm mb-6">আপনার কার্টে কোনো প্রোডাক্ট নেই। আগে একটি প্রোডাক্ট বেছে নিন।</p>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 divide-y divide-gray-100">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md mb-6 divide-y divide-gray-100">
               {cart.map((item) => (
                 <div key={item.cartLineId} className="p-4 flex items-center space-x-4">
                   <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded" />
@@ -2032,12 +2070,12 @@ export default function App() {
                     )}
                     <p className="text-red-600 font-bold text-sm mt-1">৳ {item.price}</p>
                   </div>
-                  <div className="flex items-center border rounded-lg">
-                    <button onClick={() => handleUpdateQuantity(item.cartLineId, -1)} className="p-2 text-gray-600 hover:bg-gray-50"><Minus className="h-3.5 w-3.5" /></button>
-                    <span className="px-3 text-sm font-semibold">{item.quantity}</span>
-                    <button onClick={() => handleUpdateQuantity(item.cartLineId, 1)} className="p-2 text-gray-600 hover:bg-gray-50"><Plus className="h-3.5 w-3.5" /></button>
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <button onClick={() => handleUpdateQuantity(item.cartLineId, -1)} className="p-2 text-gray-600 hover:bg-gray-100 transition-colors"><Minus className="h-3.5 w-3.5" /></button>
+                    <span className="px-3 text-sm font-semibold tabular-nums">{item.quantity}</span>
+                    <button onClick={() => handleUpdateQuantity(item.cartLineId, 1)} className="p-2 text-gray-600 hover:bg-gray-100 transition-colors"><Plus className="h-3.5 w-3.5" /></button>
                   </div>
-                  <button onClick={() => handleRemoveFromCart(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1">
+                  <button onClick={() => handleRemoveFromCart(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1 transition-colors">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -2052,20 +2090,20 @@ export default function App() {
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
             <h3 className="text-lg font-bold mb-4 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-red-600" /> পেমেন্ট মাধ্যম বেছে নিন</h3>
             <div className="flex space-x-4 mb-6">
-              <button onClick={() => setPaymentMethod('bkash')} className={`flex-1 py-3 border rounded-lg font-bold ${paymentMethod === 'bkash' ? 'border-red-500 bg-red-50 text-red-600' : 'border-gray-200'}`}>bKash</button>
-              <button onClick={() => setPaymentMethod('nagad')} className={`flex-1 py-3 border rounded-lg font-bold ${paymentMethod === 'nagad' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200'}`}>Nagad</button>
+              <button onClick={() => setPaymentMethod('bkash')} className={`flex-1 py-3 border rounded-lg font-bold transition-all duration-150 ${paymentMethod === 'bkash' ? 'border-red-500 bg-red-50 text-red-600 ring-1 ring-red-500 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>bKash</button>
+              <button onClick={() => setPaymentMethod('nagad')} className={`flex-1 py-3 border rounded-lg font-bold transition-all duration-150 ${paymentMethod === 'nagad' ? 'border-orange-500 bg-orange-50 text-orange-600 ring-1 ring-orange-500 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>Nagad</button>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <p className="text-sm text-gray-600 mb-1">অনুগ্রহ করে <b>{paymentMethod.toUpperCase()}</b>-এ টাকা পাঠান:</p>
               <p className="text-xl font-bold text-gray-900 mb-4">+880 1620 177883</p>
               <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)}
-                placeholder="আপনার একাউন্ট নাম্বার (যেমনঃ 017xxxxxxxx)" className="w-full border p-2.5 rounded mb-3 outline-none focus:border-red-500" />
+                placeholder="আপনার একাউন্ট নাম্বার (যেমনঃ 017xxxxxxxx)" className="w-full border p-2.5 rounded mb-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
               <input type="text" value={trxId} onChange={(e) => setTrxId(e.target.value)}
-                placeholder="ট্রানজেকশন আইডি (TrxID) লিখুন" className="w-full border p-2.5 rounded outline-none focus:border-red-500" />
+                placeholder="ট্রানজেকশন আইডি (TrxID) লিখুন" className="w-full border p-2.5 rounded outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
             </div>
           </div>
           <button onClick={handleConfirmOrder} disabled={cart.length === 0 || orderSubmitting}
-            className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg disabled:opacity-60">
+            className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/25 active:scale-[0.99] disabled:opacity-60 disabled:active:scale-100">
             {orderSubmitting ? 'সাবমিট হচ্ছে...' : isCustomerLoggedIn ? 'পাইকারি অর্ডার নিশ্চিত করুন' : 'লগ ইন করে অর্ডার নিশ্চিত করুন'}
           </button>
         </div>
@@ -2080,24 +2118,24 @@ export default function App() {
 
           {/* Hero */}
           <section className="bg-gray-50 border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 pb-12 grid md:grid-cols-2 gap-8 items-center">
-              <div>
-                <h1 className="font-display text-3xl md:text-4xl font-bold leading-snug text-gray-900">
+            <div className="max-w-6xl mx-auto px-4 pb-14 grid md:grid-cols-2 gap-10 items-center">
+              <div className="animate-hero-in">
+                <h1 className="font-display text-3xl md:text-[2.75rem] font-bold leading-[1.15] text-gray-900">
                   চীনের পাইকারি বাজার, এখন আপনার দোকান পর্যন্ত
                 </h1>
                 <p className="mt-4 text-gray-600 text-base leading-relaxed max-w-md">
                   হাজারো ভেরিফায়েড চীনা সাপ্লায়ারের প্রোডাক্ট সরাসরি অর্ডার করুন, বিকাশ বা নগদে পেমেন্ট করুন — আমরা সোর্স করে আপনার ঠিকানায় পৌঁছে দেব।
                 </p>
-                <div className="mt-6 flex gap-3">
-                  <button onClick={scrollToProducts} className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg">
+                <div className="mt-7 flex gap-3">
+                  <button onClick={scrollToProducts} className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
                     প্রোডাক্ট দেখুন
                   </button>
-                  <button onClick={scrollToHowItWorks} className="border border-gray-300 hover:border-gray-400 text-gray-700 font-semibold px-6 py-3 rounded-lg">
+                  <button onClick={scrollToHowItWorks} className="border border-gray-300 hover:border-gray-400 text-gray-700 font-semibold px-6 py-3 rounded-lg transition-all duration-200 hover:bg-white hover:-translate-y-0.5 active:translate-y-0">
                     কীভাবে অর্ডার করব?
                   </button>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm animate-hero-in-delay">
                 <RouteGraphic />
               </div>
             </div>
@@ -2105,11 +2143,20 @@ export default function App() {
 
           {/* Stats / trust strip */}
           <section className="bg-white border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="flex items-center gap-2"><Package className="h-5 w-5 text-red-600 shrink-0" /><span>৫,০০০+ পণ্যের ক্যাটালগ</span></div>
-              <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-red-600 shrink-0" /><span>ভেরিফায়েড সাপ্লায়ার</span></div>
-              <div className="flex items-center gap-2"><Wallet className="h-5 w-5 text-red-600 shrink-0" /><span>বিকাশ ও নগদ পেমেন্ট</span></div>
-              <div className="flex items-center gap-2"><Truck className="h-5 w-5 text-red-600 shrink-0" /><span>৬৪ জেলায় ডেলিভারি</span></div>
+            <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {[
+                { icon: Package, label: '৫,০০০+ পণ্যের ক্যাটালগ' },
+                { icon: ShieldCheck, label: 'ভেরিফায়েড সাপ্লায়ার' },
+                { icon: Wallet, label: 'বিকাশ ও নগদ পেমেন্ট' },
+                { icon: Truck, label: '৬৪ জেলায় ডেলিভারি' },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors hover:bg-red-50/60">
+                  <span className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-gray-700">{label}</span>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -2118,13 +2165,13 @@ export default function App() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-xl font-bold text-gray-900">ক্যাটাগরি ঘুরে দেখুন</h2>
               {selectedCategory && (
-                <button onClick={() => setSelectedCategory(null)} className="text-xs text-red-600 hover:underline">সব দেখুন ✕</button>
+                <button onClick={() => setSelectedCategory(null)} className="text-xs text-red-600 hover:underline transition-colors">সব দেখুন ✕</button>
               )}
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-2">
+            <div className="flex gap-3 overflow-x-auto pb-2 thin-scroll">
               {CATEGORIES.map((c) => (
                 <button key={c.name} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); scrollToProducts(); }}
-                  className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-colors ${selectedCategory === c.name ? 'bg-red-50 border-red-400' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300'}`}>
+                  className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selectedCategory === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
                   <span className="text-2xl">{c.emoji}</span>
                   <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
                 </button>
@@ -2134,20 +2181,23 @@ export default function App() {
 
           {/* How it works */}
           <section ref={howItWorksRef} className="bg-red-700 text-white">
-            <div className="max-w-6xl mx-auto px-4 py-12">
-              <h2 className="font-display text-xl font-bold mb-8">মাত্র ৩ ধাপে অর্ডার করুন</h2>
-              <div className="grid md:grid-cols-3 gap-8">
+            <div className="max-w-6xl mx-auto px-4 py-14">
+              <h2 className="font-display text-xl font-bold mb-9">মাত্র ৩ ধাপে অর্ডার করুন</h2>
+              <div className="grid md:grid-cols-3 gap-8 md:gap-6 relative">
                 {[
                   { n: '১', t: 'প্রোডাক্ট বাছাই করুন', d: 'ক্যাটালগ থেকে পছন্দের প্রোডাক্ট ও পরিমাণ বেছে নিন।' },
                   { n: '২', t: 'বিকাশ/নগদে পেমেন্ট করুন', d: 'নির্দিষ্ট নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন।' },
                   { n: '৩', t: 'আমরা সোর্স করে পাঠাই', d: 'চীন থেকে প্রোডাক্ট সংগ্রহ করে আপনার ঠিকানায় ডেলিভারি করি।' },
-                ].map((s) => (
-                  <div key={s.n} className="flex gap-4">
-                    <span className="font-display text-3xl font-extrabold text-white">{s.n}</span>
-                    <div>
+                ].map((s, i) => (
+                  <div key={s.n} className="flex gap-4 relative">
+                    <span className="font-display h-12 w-12 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl font-extrabold text-white">
+                      {s.n}
+                    </span>
+                    <div className="pt-1">
                       <h3 className="font-semibold mb-1">{s.t}</h3>
                       <p className="text-sm text-red-100 leading-relaxed">{s.d}</p>
                     </div>
+                    {i < 2 && <div className="hidden md:block absolute top-6 left-[calc(100%-1.25rem)] w-6 border-t border-dashed border-white/30" />}
                   </div>
                 ))}
               </div>
@@ -2164,17 +2214,17 @@ export default function App() {
             {visibleProducts.length === 0 ? (
               <p className="text-gray-500 text-sm">কোনো প্রোডাক্ট পাওয়া যায়নি। {products.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
                 {visibleProducts.map((p) => {
                   const hasVariants = (p.sizes && p.sizes.length > 0) || (p.colors && p.colors.length > 0);
                   return (
-                    <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
-                      <button onClick={() => setDetailProduct(p)} className="block">
-                        <img src={p.image} alt={p.title} className="h-40 w-full object-cover" />
+                    <div key={p.id} className="group bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/70 hover:-translate-y-1 hover:border-gray-300">
+                      <button onClick={() => setDetailProduct(p)} className="block overflow-hidden">
+                        <img src={p.image} alt={p.title} className="h-40 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
                       </button>
-                      <div className="p-3 flex flex-col flex-1">
+                      <div className="p-3.5 flex flex-col flex-1">
                         <button onClick={() => setDetailProduct(p)} className="text-left">
-                          <h3 className="text-sm font-semibold text-gray-800 leading-snug">{p.title}</h3>
+                          <h3 className="text-sm font-semibold text-gray-800 leading-snug transition-colors group-hover:text-red-700">{p.title}</h3>
                         </button>
                         {hasVariants && (
                           <p className="text-[11px] text-gray-400 mt-1">
@@ -2183,11 +2233,11 @@ export default function App() {
                             {p.colors?.length ? `${p.colors.length} কালার` : ''}
                           </p>
                         )}
-                        <div className="mt-auto pt-3 flex items-center justify-between">
+                        <div className="mt-auto pt-3 flex items-center justify-between gap-2">
                           <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
                           <button
                             onClick={() => hasVariants ? setDetailProduct(p) : handleAddToCart(p)}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 hover:shadow-md hover:shadow-red-600/25 active:scale-95">
                             {hasVariants ? 'অপশন বাছাই' : 'কার্টে যোগ করুন'}
                           </button>
                         </div>
@@ -2201,18 +2251,20 @@ export default function App() {
 
           {/* Footer */}
           <footer className="bg-red-700 text-red-100">
-            <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row justify-between gap-4 text-sm">
+            <div className="max-w-6xl mx-auto px-4 py-9 flex flex-col md:flex-row md:items-center justify-between gap-5 text-sm">
               <span className="flex items-center gap-2 font-display text-lg font-bold text-white">
                 <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
                 Druto<span className="font-medium text-red-100">Link</span>
               </span>
-              <span>© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
-              <button onClick={() => setCurrentView('worker')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto mr-4">
-                কর্মী লগইন
-              </button>
-              <button onClick={() => setCurrentView('admin')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto">
-                অ্যাডমিন প্যানেল
-              </button>
+              <span className="text-red-200">© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
+              <div className="flex items-center gap-5">
+                <button onClick={() => setCurrentView('worker')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto transition-colors">
+                  কর্মী লগইন
+                </button>
+                <button onClick={() => setCurrentView('admin')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto transition-colors">
+                  অ্যাডমিন প্যানেল
+                </button>
+              </div>
             </div>
           </footer>
         </>
