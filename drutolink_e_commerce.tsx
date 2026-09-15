@@ -1308,7 +1308,12 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
 
 // --- MAIN STOREFRONT & PASSWORD GATE COMPONENT ---
 export default function App() {
-  const [currentView, setCurrentView] = useState('home');
+  // পণ্য বাড়ার সাথে সাথে ফুটার অনেক নিচে চলে যায়, তাই worker/admin প্যানেলে
+  // সরাসরি URL হ্যাশ (#worker, #admin) দিয়ে ঢোকা যাবে — স্ক্রল করার দরকার নেই।
+  const [currentView, setCurrentView] = useState(() => {
+    const h = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
+    return (h === 'admin' || h === 'worker') ? h : 'home';
+  });
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -1318,9 +1323,20 @@ export default function App() {
   const [accountNumber, setAccountNumber] = useState('');
   const [trxId, setTrxId] = useState('');
   const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [staffMenuOpen, setStaffMenuOpen] = useState(false);
 
   const productsRef = useRef(null);
   const howItWorksRef = useRef(null);
+
+  // currentView admin/worker হলে URL হ্যাশ আপডেট রাখি, যাতে লিংকটা বুকমার্ক করা যায়
+  // এবং রিফ্রেশ দিলেও সরাসরি প্যানেলে ঢোকা যায় — ফুটার পর্যন্ত স্ক্রল করা লাগবে না।
+  useEffect(() => {
+    if (currentView === 'admin' || currentView === 'worker') {
+      if (window.location.hash !== `#${currentView}`) window.location.hash = currentView;
+    } else if (window.location.hash === '#admin' || window.location.hash === '#worker') {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [currentView]);
 
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -1899,6 +1915,21 @@ export default function App() {
               <ShoppingCart className="h-5 w-5" />
               <span className="absolute -top-2 -right-2 bg-white text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartCount}</span>
               <span className="text-xs mt-0.5">কার্ট</span>
+            </div>
+            {/* কর্মী/অ্যাডমিন প্রবেশ — sticky হেডারে থাকায় পণ্য যতই বাড়ুক, স্ক্রল না করেই সবসময় হাতের কাছে থাকবে */}
+            <div className="relative">
+              <div onClick={() => setStaffMenuOpen((v) => !v)} className="flex flex-col items-center cursor-pointer opacity-70 hover:opacity-100">
+                <Lock className="h-5 w-5" />
+                <span className="text-xs mt-0.5">স্টাফ</span>
+              </div>
+              {staffMenuOpen && (
+                <div className="absolute right-0 mt-2 w-40 bg-white text-gray-800 rounded-lg shadow-lg overflow-hidden z-50 text-sm">
+                  <button onClick={() => { setStaffMenuOpen(false); setCurrentView('worker'); }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-red-50">কর্মী লগইন</button>
+                  <button onClick={() => { setStaffMenuOpen(false); setCurrentView('admin'); }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-red-50 border-t border-gray-100">অ্যাডমিন প্যানেল</button>
+                </div>
+              )}
             </div>
           </div>
         </div>
