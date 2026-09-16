@@ -3088,6 +3088,9 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemove={handleRemoveFromCart}
         cartTotal={cartTotal}
+        estimatedWeightKg={estimatedCartWeightKg}
+        estimatedShipping={estimatedShippingCharge}
+        estimatedGrandTotal={estimatedGrandTotal}
         onCheckout={() => { setIsCartOpen(false); setCurrentView('checkout'); }}
       />
 
