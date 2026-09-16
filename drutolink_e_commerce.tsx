@@ -22,7 +22,7 @@ import {
 const ADMIN_EMAIL = 'admin@drutolink.com';
 
 // সাইটের লোগো — সব হেডার/সাইডবার/ফুটার এই একই লিংক থেকে লোগো দেখায়
-const LOGO_URL = 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/logo.png';
+const LOGO_URL = '/logo.png';
 
 // অর্ডারের ধাপগুলো — ঠিক এই ক্রমে, AdminDashboard-এর স্ট্যাটাস ড্রপডাউনের সাথে মিলিয়ে
 // একটা এলিমেন্ট স্ক্রল করে চোখের সামনে এলে true হয়ে যায় — নিচের দিকের সেকশনগুলোকে
@@ -138,9 +138,8 @@ function StepCard({ step, index }) {
 
 
 const FONTS = `
-@import url('https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
-.font-display { font-family: 'Baloo Da 2', 'Hind Siliguri', sans-serif; }
-.font-body { font-family: 'Hind Siliguri', sans-serif; }
+.font-display { font-family: 'Poppins', 'Noto Sans Bengali', 'Hind Siliguri', system-ui, sans-serif; }
+.font-body { font-family: 'Noto Sans Bengali', 'Hind Siliguri', system-ui, sans-serif; }
 
 html { scroll-behavior: smooth; }
 * { -webkit-tap-highlight-color: transparent; }
@@ -209,9 +208,9 @@ const CATEGORIES = [
 ];
 
 const SLIDES = [
-  { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide1.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং' },
-  { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide2.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
-  { image: 'https://raw.githubusercontent.com/mahmudmahirgenexofficialbd-svg/drutolink/main/slide3.jpg', alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
+  { image: '/slide1.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং' },
+  { image: '/slide2.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
+  { image: '/slide3.jpg', alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
 ];
 
 // --- IMAGE SLIDER ---
@@ -1077,7 +1076,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
         title,
         price,
         category,
-        image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+        image: image || '/product-placeholder.svg',
         sizes,
         colors,
       };
@@ -2024,14 +2023,22 @@ export default function App() {
 
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [productsLoadError, setProductsLoadError] = useState(false);
 
-  // Real-time product feed from Firestore — visible to every visitor, not just this browser
+  // Real-time product feed from Firestore. A Firestore/network error must never
+  // prevent the storefront shell from rendering; the UI can continue to work
+  // and show a small retry message instead of becoming a blank/blocked page.
   useEffect(() => {
+    let mounted = true;
     const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
+      if (!mounted) return;
+      setProductsLoadError(false);
       setProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {
+      if (mounted) setProductsLoadError(true);
     });
-    return () => unsub();
+    return () => { mounted = false; unsub(); };
   }, []);
 
   // ছবি দিয়ে প্রোডাক্ট খোঁজা — পুরোটাই ব্রাউজারে চলে, কোনো API লাগে না (visualSearch.ts দেখুন)
@@ -2125,6 +2132,8 @@ export default function App() {
     const q = query(collection(db, 'workers'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setWorkers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {
+      setWorkers([]);
     });
     return () => unsub();
   }, [isAdminLoggedIn]);
@@ -2143,6 +2152,8 @@ export default function App() {
     if (!q) { setWithdrawalRequests([]); return; }
     const unsub = onSnapshot(q, (snapshot) => {
       setWithdrawalRequests(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {
+      setWithdrawalRequests([]);
     });
     return () => unsub();
   }, [authUser, isAdminLoggedIn, isWorkerLoggedIn]);
@@ -2161,6 +2172,8 @@ export default function App() {
 
     const unsub = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {
+      setOrders([]);
     });
     return () => unsub();
   }, [authChecked, authUser, isAdminLoggedIn]);
@@ -2331,7 +2344,7 @@ export default function App() {
         title,
         price,
         category,
-        image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+        image: image || '/product-placeholder.svg',
         sizes,
         colors,
         createdAt: serverTimestamp(),
@@ -2715,6 +2728,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white font-body text-gray-900">
+      {productsLoadError && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm px-4 py-2 text-center">
+          পণ্য লোড করতে সাময়িক সমস্যা হচ্ছে। সংযোগ ঠিক হলে তালিকা স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবে।
+        </div>
+      )}
       <style>{FONTS}</style>
 
       {/* ছবি সার্চের লুকানো ফাইল ইনপুট — capture থাকায় মোবাইলে সরাসরি ক্যামেরাও খোলা যায় */}
