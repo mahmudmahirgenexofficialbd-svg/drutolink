@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA_tlF7dDeJzGiGEjVv9jKzA86X3ZE2dEc",
@@ -16,6 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app); // প্রোডাক্ট ছবি এখানে (Firebase Storage) আপলোড হবে, Firestore-এ শুধু ছোট download URL সেভ হবে
 
 // দ্বিতীয় একটা Firebase App instance — শুধু অ্যাডমিন প্যানেল থেকে নতুন
 // worker অ্যাকাউন্ট তৈরি করার জন্য ব্যবহার হয়। createUserWithEmailAndPassword
