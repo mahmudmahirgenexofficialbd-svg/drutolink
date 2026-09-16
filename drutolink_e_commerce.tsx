@@ -161,6 +161,13 @@ html { scroll-behavior: smooth; }
 @keyframes stepPop { 0% { opacity: 0; transform: translateY(22px) scale(0.94); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes stepBadgePulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.45); } 70% { box-shadow: 0 0 0 10px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
 @keyframes stepBadgeFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-5px) rotate(-3deg); } }
+@keyframes heroGlow { 0%,100% { opacity:.55; transform:scale(1); } 50% { opacity:.8; transform:scale(1.04); } }
+@keyframes routePulse { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+.hero-glow { animation: heroGlow 5s ease-in-out infinite; }
+.route-pulse { animation: routePulse 3s ease-in-out infinite; }
+.product-trust-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.product-trust-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(15,23,42,.07); border-color:#e5e7eb; }
+
 
 .animate-hero-in { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-hero-in-delay { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
@@ -363,71 +370,140 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
 function ProductDetailModal({ product, onClose, onAddToCart }) {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
     setSelectedSize(product?.sizes?.[0] || '');
     setSelectedColor(product?.colors?.[0]?.name || '');
+    setQuantity(1);
+    setActiveImage(0);
   }, [product]);
 
   if (!product) return null;
 
   const hasSizes = product.sizes && product.sizes.length > 0;
   const hasColors = product.colors && product.colors.length > 0;
+  const images = Array.from(new Set([product.image, ...(Array.isArray(product.images) ? product.images : [])].filter(Boolean)));
+  const hasExtraInfo = product.description || product.material || product.weight || product.model || product.specification;
 
   const handleAdd = () => {
-    onAddToCart(product, {
-      selectedSize: hasSizes ? selectedSize : undefined,
-      selectedColor: hasColors ? selectedColor : undefined,
-    });
+    for (let i = 0; i < quantity; i += 1) {
+      onAddToCart(product, {
+        selectedSize: hasSizes ? selectedSize : undefined,
+        selectedColor: hasColors ? selectedColor : undefined,
+      });
+    }
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-body">
-      <div onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-fade-in" />
-      <div className="relative bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto thin-scroll shadow-2xl animate-scale-in">
-        <button onClick={onClose} className="absolute top-3 right-3 bg-white/90 hover:bg-white rounded-full p-1.5 shadow-md z-10 transition-transform hover:scale-105">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 font-body">
+      <div onClick={onClose} className="absolute inset-0 bg-slate-950/60 backdrop-blur-[3px] animate-fade-in" />
+      <div role="dialog" aria-modal="true" aria-label="পণ্যের বিস্তারিত" className="relative bg-white rounded-3xl max-w-5xl w-full max-h-[94vh] overflow-y-auto thin-scroll shadow-2xl animate-scale-in">
+        <button onClick={onClose} className="absolute top-3 right-3 bg-white/95 hover:bg-white rounded-full p-2 shadow-lg z-20 transition-transform hover:scale-105" aria-label="বন্ধ করুন">
           <X className="h-5 w-5 text-gray-700" />
         </button>
-        <img src={product.image} alt={product.title} className="w-full h-56 object-cover rounded-t-2xl" />
-        <div className="p-5 md:p-6">
-          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-full">{product.category}</span>
-          <h3 className="font-display text-xl font-bold text-gray-900 mt-3 leading-snug">{product.title}</h3>
-          <p className="text-red-600 font-bold text-xl mt-1.5">৳ {product.price}</p>
 
-          {hasSizes && (
-            <div className="mt-5">
-              <p className="text-sm font-semibold text-gray-700 mb-2">সাইজ বাছাই করুন</p>
-              <div className="flex flex-wrap gap-2">
-                {product.sizes.map((s) => (
-                  <button key={s} onClick={() => setSelectedSize(s)}
-                    className={`px-3.5 py-1.5 rounded-lg border text-sm font-semibold transition-all ${selectedSize === s ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
-                    {s}
+        <div className="grid lg:grid-cols-[1.02fr_.98fr]">
+          <div className="p-4 md:p-6 bg-slate-50 border-b lg:border-b-0 lg:border-r border-gray-100">
+            <div className="aspect-square md:aspect-[4/3] bg-white rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center">
+              <img src={images[activeImage]} alt={product.title} className="w-full h-full object-contain" />
+            </div>
+            {images.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {images.map((src, i) => (
+                  <button key={`${src}-${i}`} onClick={() => setActiveImage(i)} className={`h-16 w-16 shrink-0 rounded-xl overflow-hidden border-2 bg-white ${activeImage === i ? 'border-red-600 ring-2 ring-red-100' : 'border-gray-200'}`}>
+                    <img src={src} alt={`${product.title} ${i + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-
-          {hasColors && (
-            <div className="mt-5">
-              <p className="text-sm font-semibold text-gray-700 mb-2">কালার বাছাই করুন</p>
-              <div className="flex flex-wrap gap-2">
-                {product.colors.map((c) => (
-                  <button key={c.name} onClick={() => setSelectedColor(c.name)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
-                    <span className="h-4 w-4 rounded-full border border-gray-300" style={{ backgroundColor: c.hex || '#ccc' }} />
-                    {c.name}
-                  </button>
-                ))}
+            )}
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <div className="product-trust-card bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-2.5">
+                <span className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><ShieldCheck className="h-4 w-4" /></span>
+                <div><p className="text-xs font-bold text-gray-800">নিরাপদ অর্ডার</p><p className="text-[10px] text-gray-500">সহজ অর্ডার প্রক্রিয়া</p></div>
+              </div>
+              <div className="product-trust-card bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-2.5">
+                <span className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><Truck className="h-4 w-4" /></span>
+                <div><p className="text-xs font-bold text-gray-800">ডেলিভারি</p><p className="text-[10px] text-gray-500">বাংলাদেশে ডেলিভারি</p></div>
               </div>
             </div>
-          )}
+          </div>
 
-          <button onClick={handleAdd}
-            className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98]">
-            কার্টে যোগ করুন
-          </button>
+          <div className="p-5 md:p-7 lg:p-8">
+            <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
+              <button onClick={onClose} className="hover:text-red-600">হোম</button>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span>{product.category || 'পণ্য'}</span>
+            </div>
+            <span className="inline-flex text-xs font-bold text-red-700 bg-red-50 border border-red-100 px-2.5 py-1 rounded-full">{product.category || 'পণ্য'}</span>
+            <h3 className="font-display text-2xl md:text-3xl font-extrabold text-gray-900 mt-3 leading-tight">{product.title}</h3>
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-1 mt-4">
+              <p className="font-display text-3xl font-extrabold text-red-700">৳ {product.price}</p>
+              <span className="text-xs text-gray-500 mb-1">বাংলাদেশি টাকা</span>
+            </div>
+            {product.description && (
+              <p className="text-sm text-gray-600 leading-7 mt-4">{product.description}</p>
+            )}
+
+            {hasSizes && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2"><p className="text-sm font-bold text-gray-800">সাইজ বাছাই করুন</p><span className="text-xs text-gray-400">{selectedSize}</span></div>
+                <div className="flex flex-wrap gap-2">
+                  {product.sizes.map((s) => (
+                    <button key={s} onClick={() => setSelectedSize(s)} className={`min-w-12 px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all ${selectedSize === s ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {hasColors && (
+              <div className="mt-5">
+                <p className="text-sm font-bold text-gray-800 mb-2">কালার বাছাই করুন</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.colors.map((c) => (
+                    <button key={c.name} onClick={() => setSelectedColor(c.name)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
+                      <span className="h-4 w-4 rounded-full border border-gray-300" style={{ backgroundColor: c.hex || '#ccc' }} />{c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <div><p className="text-xs font-semibold text-gray-500 mb-1">পরিমাণ</p><div className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-11">
+                <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="h-full px-3 text-gray-600 hover:bg-gray-50"><Minus className="h-4 w-4" /></button>
+                <span className="w-10 text-center font-bold text-sm tabular-nums">{quantity}</span>
+                <button onClick={() => setQuantity((q) => q + 1)} className="h-full px-3 text-gray-600 hover:bg-gray-50"><Plus className="h-4 w-4" /></button>
+              </div></div>
+              <div className="text-right"><p className="text-xs text-gray-500">এই অর্ডারের মূল্য</p><p className="font-display text-xl font-extrabold text-gray-900">৳ {Number(product.price) * quantity}</p></div>
+            </div>
+
+            <button onClick={handleAdd} className="w-full mt-5 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.99] flex items-center justify-center gap-2">
+              <ShoppingCart className="h-5 w-5" /> কার্টে যোগ করুন
+            </button>
+            <p className="text-center text-xs text-gray-400 mt-2">কার্টে যোগ করার পর চেকআউট থেকে অর্ডার নিশ্চিত করতে পারবেন।</p>
+
+            {hasExtraInfo && (
+              <div className="mt-7 border-t border-gray-100 pt-5">
+                <h4 className="font-display font-bold text-gray-900 mb-3">পণ্যের তথ্য</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                  {product.material && <div className="bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">Material:</span> <b>{product.material}</b></div>}
+                  {product.weight && <div className="bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">Weight:</span> <b>{product.weight}</b></div>}
+                  {product.model && <div className="bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">Model:</span> <b>{product.model}</b></div>}
+                  {product.specification && <div className="bg-gray-50 rounded-lg px-3 py-2 sm:col-span-2"><span className="text-gray-500">Specification:</span> <b>{product.specification}</b></div>}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 bg-red-50/70 border border-red-100 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="h-9 w-9 shrink-0 rounded-full bg-white text-red-600 flex items-center justify-center shadow-sm"><Wallet className="h-4 w-4" /></div>
+                <div><p className="text-sm font-bold text-gray-900">পেমেন্ট ও ডেলিভারি</p><p className="text-xs text-gray-600 mt-1 leading-5">বিকাশ ও নগদ পেমেন্ট সুবিধা রয়েছে। অর্ডার প্রসেসিং শেষে বাংলাদেশে ডেলিভারি করা হয়।</p></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2208,6 +2284,10 @@ export default function App() {
 
   const scrollToProducts = () => productsRef.current?.scrollIntoView({ behavior: 'smooth' });
   const scrollToHowItWorks = () => howItWorksRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const goToOrders = () => {
+    if (isCustomerLoggedIn) setCurrentView('account');
+    else { setRedirectAfterLogin('account'); setCurrentView('login'); }
+  };
 
   // ছবি-সার্চ চালু থাকলে সেটাই অগ্রাধিকার পায় — মিলের ক্রমে সাজানো ফল দেখায়।
   // তখন লেখা-সার্চ ও ক্যাটাগরি ফিল্টার বাদ থাকে, নইলে ফল প্রায় সবসময় খালি আসত।
@@ -2446,7 +2526,11 @@ export default function App() {
               <Search className="h-4 w-4" />
             </button>
           </form>
-          <div className="flex items-center gap-5 text-sm">
+          <nav className="hidden xl:flex items-center gap-5 text-sm font-medium text-white/95">
+            <button onClick={scrollToHowItWorks} className="hover:text-white/70 transition-colors">কীভাবে কাজ করে</button>
+            <button onClick={goToOrders} className="hover:text-white/70 transition-colors">অর্ডার ট্র্যাক</button>
+          </nav>
+          <div className="flex items-center gap-4 text-sm">
             {isCustomerLoggedIn ? (
               <div onClick={() => setCurrentView('account')} className="flex flex-col items-center cursor-pointer transition-opacity hover:opacity-80">
                 <User className="h-5 w-5" />
@@ -2658,41 +2742,78 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* Image slider */}
-          <section className="bg-gray-50 border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 py-6">
-              <ImageSlider />
-            </div>
-          </section>
-
-          {/* Hero */}
-          <section className="bg-gray-50 border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 pb-14 grid md:grid-cols-2 gap-10 items-center">
+          {/* Homepage 2.0 — premium hero */}
+          <section className="relative overflow-hidden bg-slate-50 border-b border-gray-200">
+            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-100/70 blur-3xl hero-glow" />
+            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-slate-200/70 blur-3xl" />
+            <div className="relative max-w-6xl mx-auto px-4 py-10 md:py-14 lg:py-16 grid lg:grid-cols-[1.05fr_.95fr] gap-10 items-center">
               <div className="animate-hero-in">
-                <h1 className="font-display text-3xl md:text-[2.75rem] font-bold leading-[1.15] text-gray-900">
-                  চীনের পাইকারি বাজার, এখন আপনার দোকান পর্যন্ত
+                <div className="inline-flex items-center gap-2 rounded-full bg-white border border-red-100 px-3 py-1.5 text-xs font-bold text-red-700 shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" /> China → Bangladesh
+                </div>
+                <h1 className="font-display text-4xl md:text-5xl lg:text-[3.35rem] font-extrabold leading-[1.08] tracking-tight text-slate-950 mt-5">
+                  চীন থেকে পছন্দের পণ্য,<br /><span className="text-red-600">সহজে আপনার ঠিকানায়</span>
                 </h1>
-                <p className="mt-4 text-gray-600 text-base leading-relaxed max-w-md">
-                  হাজারো ভেরিফায়েড চীনা সাপ্লায়ারের প্রোডাক্ট সরাসরি অর্ডার করুন, বিকাশ বা নগদে পেমেন্ট করুন — আমরা সোর্স করে আপনার ঠিকানায় পৌঁছে দেব।
+                <p className="mt-5 text-gray-600 text-base md:text-lg leading-8 max-w-xl">
+                  পণ্য খুঁজুন, অর্ডার দিন—চীন থেকে সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির পুরো প্রক্রিয়া এক জায়গায়।
                 </p>
-                <div className="mt-7 flex gap-3">
-                  <button onClick={scrollToProducts} className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
-                    প্রোডাক্ট দেখুন
+                <div className="mt-7 flex flex-col sm:flex-row gap-3">
+                  <button onClick={scrollToProducts} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3.5 rounded-xl transition-all duration-200 hover:shadow-xl hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
+                    পণ্য খুঁজুন <ChevronRight className="inline-block h-4 w-4 ml-1" />
                   </button>
-                  <button onClick={scrollToHowItWorks} className="border border-gray-300 hover:border-gray-400 text-gray-700 font-semibold px-6 py-3 rounded-lg transition-all duration-200 hover:bg-white hover:-translate-y-0.5 active:translate-y-0">
-                    কীভাবে অর্ডার করব?
+                  <button onClick={openImageSearch} className="bg-white border border-gray-300 hover:border-red-300 hover:bg-red-50/50 text-gray-800 font-bold px-6 py-3.5 rounded-xl transition-all duration-200">
+                    <Camera className="inline-block h-4 w-4 mr-2 text-red-600" /> ছবি দিয়ে খুঁজুন
                   </button>
                 </div>
+                <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs md:text-sm text-gray-600">
+                  <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-600" /> বিকাশ ও নগদ</span>
+                  <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-600" /> ৬৪ জেলায় ডেলিভারি</span>
+                  <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-600" /> অনলাইন ক্যাটালগ</span>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm animate-hero-in-delay">
-                <RouteGraphic />
+
+              <div className="relative animate-hero-in-delay">
+                <div className="absolute -inset-4 rounded-[2rem] bg-red-100/60 blur-2xl" />
+                <div className="relative bg-white rounded-[2rem] border border-gray-200 p-5 md:p-7 shadow-xl shadow-slate-200/70">
+                  <div className="flex items-center justify-between mb-5">
+                    <div><p className="text-xs text-gray-500">DrutoLink delivery route</p><p className="font-display font-bold text-lg text-gray-900">চীন → বাংলাদেশ</p></div>
+                    <span className="h-10 w-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center"><Package className="h-5 w-5" /></span>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 md:p-5">
+                    <RouteGraphic />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-4">
+                    {[{icon: Package, t:'সোর্সিং'}, {icon: ShieldCheck, t:'প্রসেসিং'}, {icon: Truck, t:'ডেলিভারি'}].map(({icon: Icon, t}) => (
+                      <div key={t} className="rounded-xl bg-slate-50 border border-gray-100 p-3 text-center">
+                        <Icon className="h-4 w-4 mx-auto text-red-600" /><p className="text-[11px] font-semibold text-gray-700 mt-1">{t}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Stats / trust strip */}
+          {/* Quick service actions */}
+          <section className="bg-white border-b border-gray-100">
+            <div className="max-w-6xl mx-auto px-4 py-6 md:py-7 grid md:grid-cols-3 gap-3">
+              {[
+                { icon: Search, title: 'পণ্য খুঁজুন', desc: 'ক্যাটালগ থেকে আপনার পছন্দের পণ্য বেছে নিন।', action: scrollToProducts },
+                { icon: Camera, title: 'ছবি দিয়ে খুঁজুন', desc: 'ছবি আপলোড করে মিল থাকা পণ্য দেখুন।', action: openImageSearch },
+                { icon: Truck, title: 'অর্ডার ট্র্যাক করুন', desc: 'লগ ইন করে আপনার অর্ডারের অবস্থা দেখুন।', action: goToOrders },
+              ].map(({icon: Icon, title, desc, action}) => (
+                <button key={title} onClick={action} className="group text-left flex items-center gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-4 hover:border-red-200 hover:bg-red-50/40 hover:-translate-y-0.5 transition-all duration-200">
+                  <span className="h-11 w-11 shrink-0 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors"><Icon className="h-5 w-5" /></span>
+                  <span><span className="block font-display font-bold text-gray-900">{title}</span><span className="block text-xs text-gray-500 mt-0.5">{desc}</span></span>
+                  <ChevronRight className="h-4 w-4 ml-auto text-gray-300 group-hover:text-red-500" />
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Trust strip */}
           <section className="bg-white border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {[
                 { icon: Package, label: '৫,০০০+ পণ্যের ক্যাটালগ' },
                 { icon: ShieldCheck, label: 'ভেরিফায়েড সাপ্লায়ার' },
@@ -2712,7 +2833,7 @@ export default function App() {
           {/* Categories */}
           <section className="max-w-6xl mx-auto px-4 py-10">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-xl font-bold text-gray-900">ক্যাটাগরি ঘুরে দেখুন</h2>
+              <div><p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">Explore</p><h2 className="font-display text-2xl font-extrabold text-gray-900">ক্যাটাগরি থেকে পণ্য খুঁজুন</h2></div>
               {selectedCategory && (
                 <button onClick={() => setSelectedCategory(null)} className="text-xs text-red-600 hover:underline transition-colors">সব দেখুন ✕</button>
               )}
@@ -2734,7 +2855,9 @@ export default function App() {
           {/* How it works */}
           <section ref={howItWorksRef} className="bg-red-700 text-white">
             <div className="max-w-6xl mx-auto px-4 py-14">
-              <h2 className="font-display text-xl font-bold mb-9">মাত্র ৩ ধাপে অর্ডার করুন</h2>
+              <p className="text-red-100 text-xs font-bold uppercase tracking-wider mb-2">Simple process</p>
+              <h2 className="font-display text-2xl md:text-3xl font-extrabold mb-3">মাত্র ৩ ধাপে অর্ডার করুন</h2>
+              <p className="text-red-100 text-sm md:text-base mb-9">পণ্য নির্বাচন থেকে ডেলিভারি—প্রক্রিয়াটি সহজ রাখাই DrutoLink-এর লক্ষ্য।</p>
               <div className="grid md:grid-cols-3 gap-8 md:gap-6 relative">
                 {[
                   { n: '১', t: 'প্রোডাক্ট বাছাই করুন', d: 'ক্যাটালগ থেকে পছন্দের প্রোডাক্ট ও পরিমাণ বেছে নিন।' },
@@ -2833,20 +2956,36 @@ export default function App() {
           </section>
 
           {/* Footer */}
-          <footer className="bg-red-700 text-red-100">
-            <div className="max-w-6xl mx-auto px-4 py-9 flex flex-col md:flex-row md:items-center justify-between gap-5 text-sm">
-              <span className="flex items-center gap-2 font-display text-lg font-bold text-white">
-                <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
-                Druto<span className="font-medium text-red-100">Link</span>
-              </span>
-              <span className="text-red-200">© ২০২৬ ড্রুটোলিংক। বিকাশ ও নগদে নিরাপদ পেমেন্ট।</span>
-              <div className="flex items-center gap-5">
-                <button onClick={() => setCurrentView('worker')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto transition-colors">
-                  কর্মী লগইন
-                </button>
-                <button onClick={() => setCurrentView('admin')} className="text-red-200 hover:text-white underline underline-offset-2 self-start md:self-auto transition-colors">
-                  অ্যাডমিন প্যানেল
-                </button>
+          <footer className="bg-slate-950 text-slate-300">
+            <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-4 gap-8">
+              <div className="md:col-span-2">
+                <div className="flex items-center gap-2 font-display text-xl font-extrabold text-white">
+                  <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
+                  Druto<span className="font-medium text-slate-300">Link</span>
+                </div>
+                <p className="text-sm leading-6 text-slate-400 max-w-md mt-4">চীন থেকে পণ্য সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির জন্য একটি সহজ ও আধুনিক প্ল্যাটফর্ম।</p>
+              </div>
+              <div>
+                <h3 className="font-bold text-white mb-3">দ্রুত লিংক</h3>
+                <div className="space-y-2 text-sm">
+                  <button onClick={() => setCurrentView('home')} className="block hover:text-white">হোম</button>
+                  <button onClick={scrollToProducts} className="block hover:text-white">পণ্য</button>
+                  <button onClick={scrollToHowItWorks} className="block hover:text-white">কীভাবে কাজ করে</button>
+                  <button onClick={goToOrders} className="block hover:text-white">অর্ডার ট্র্যাক</button>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-bold text-white mb-3">স্টাফ</h3>
+                <div className="space-y-2 text-sm">
+                  <button onClick={() => setCurrentView('worker')} className="block hover:text-white">কর্মী লগইন</button>
+                  <button onClick={() => setCurrentView('admin')} className="block hover:text-white">অ্যাডমিন প্যানেল</button>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-white/10">
+              <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row gap-2 items-center justify-between text-xs text-slate-500">
+                <span>© ২০২৬ DrutoLink. সর্বস্বত্ব সংরক্ষিত।</span>
+                <span>বিকাশ ও নগদ পেমেন্ট সুবিধা</span>
               </div>
             </div>
           </footer>
