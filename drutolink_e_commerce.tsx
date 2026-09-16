@@ -10,7 +10,7 @@ import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where,
-  serverTimestamp, updateDoc, setDoc, getDoc,
+  serverTimestamp, updateDoc, setDoc, getDoc, runTransaction,
 } from 'firebase/firestore';
 import {
   onAuthStateChanged, signInWithEmailAndPassword, signOut,
@@ -1098,7 +1098,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       setActiveTab('orders');
     } catch (err) {
-      alert('প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
+      alert(err?.message || 'প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
     } finally {
       setSaving(false);
     }
@@ -1367,7 +1367,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 {products.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো প্রোডাক্ট যোগ করা হয়নি।</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     {products.map((p) => (
                       <div key={p.id} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
                         <div className="flex items-center space-x-3">
@@ -1432,7 +1432,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
               </div>
 
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
-                <h3 className="text-lg font-bold mb-4">কর্মী তালিকা, টার্গেট ও পেমেন্ট সেটিংস ({workers.length} জন)</h3>
+                <h3 className="text-lg font-bold mb-4">কর্মী তালিকা, লিমিট ও পেমেন্ট সেটিংস ({workers.length} জন)</h3>
                 {workers.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো কর্মী অ্যাকাউন্ট তৈরি করা হয়নি।</p>
                 ) : (
@@ -1468,7 +1468,9 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
                         <th className="p-3 font-medium">কর্মী</th>
                         <th className="p-3 font-medium">পরিমাণ</th>
+                        <th className="p-3 font-medium">রিকোয়েস্টের সময়</th>
                         <th className="p-3 font-medium">স্ট্যাটাস</th>
+                        <th className="p-3 font-medium">প্রসেসের সময়</th>
                         <th className="p-3 font-medium">অ্যাকশন</th>
                       </tr>
                     </thead>
@@ -1476,7 +1478,8 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       {withdrawalRequests.map((r) => (
                         <tr key={r.id} className="border-b border-gray-100 align-middle">
                           <td className="p-3 text-sm font-semibold">{r.workerName}</td>
-                          <td className="p-3 text-sm text-red-600 font-bold">৳ {r.amount}</td>
+                          <td className="p-3 text-sm text-red-600 font-bold">৳ {Number(r.amount || 0).toLocaleString('en-BD')}</td>
+                          <td className="p-3 text-xs text-gray-500">{toJsDate(r.createdAt)?.toLocaleString('bn-BD') || '—'}</td>
                           <td className="p-3">
                             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                               r.status === 'paid' ? 'bg-green-100 text-green-700'
@@ -1486,6 +1489,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                               {r.status === 'paid' ? 'পরিশোধিত' : r.status === 'rejected' ? 'বাতিল' : 'অপেক্ষমান'}
                             </span>
                           </td>
+                          <td className="p-3 text-xs text-gray-500">{toJsDate(r.processedAt)?.toLocaleString('bn-BD') || '—'}</td>
                           <td className="p-3">
                             {r.status === 'pending' && (
                               <div className="flex gap-2">
@@ -1515,7 +1519,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   );
 }
 
-// --- WORKER CARD (in AdminDashboard's Workers tab) — assign category, listing target, per-listing rate ---
+// --- WORKER CARD (in AdminDashboard's Workers tab) ---
 function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
   const [assignedCategory, setAssignedCategory] = useState(worker.assignedCategory || '');
   const [listingTarget, setListingTarget] = useState(worker.listingTarget ?? '');
@@ -1523,13 +1527,28 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const earned = productCount * (Number(ratePerListing) || 0);
+  useEffect(() => {
+    setAssignedCategory(worker.assignedCategory || '');
+    setListingTarget(worker.listingTarget ?? '');
+    setRatePerListing(worker.ratePerListing ?? '');
+  }, [worker.assignedCategory, worker.listingTarget, worker.ratePerListing]);
+
+  const cycleUsed = Number(worker.listingUsed ?? productCount ?? 0);
+  const lifetimeListings = Number(worker.lifetimeListings ?? productCount ?? 0);
+  const listingLimit = worker.listingTarget == null || worker.listingTarget === '' ? null : Number(worker.listingTarget);
+  const currentEarnings = Number(worker.currentEarnings ?? (cycleUsed * (Number(ratePerListing) || 0)));
+  const limitReached = listingLimit !== null && cycleUsed >= listingLimit;
+  const progress = listingLimit !== null && listingLimit > 0 ? Math.min(100, Math.round((cycleUsed / listingLimit) * 100)) : 0;
 
   const onSave = async () => {
     setSaving(true);
     setSaved(false);
     try {
-      await onSaveSettings(worker.id, { assignedCategory, listingTarget, ratePerListing });
+      await onSaveSettings(worker.id, {
+        assignedCategory, listingTarget, ratePerListing,
+        currentListingUsed: cycleUsed,
+        currentLifetimeListings: lifetimeListings,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -1540,25 +1559,45 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
   return (
     <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3 transition-shadow duration-200 hover:shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center shrink-0">
             {(worker.name || worker.email || '?')[0].toUpperCase()}
           </div>
-          <div>
-            <h4 className="font-bold text-sm text-gray-800">{worker.name || 'নামহীন'}</h4>
-            <p className="text-xs text-gray-500">{worker.email}</p>
+          <div className="min-w-0">
+            <h4 className="font-bold text-sm text-gray-800 truncate">{worker.name || 'নামহীন'}</h4>
+            <p className="text-xs text-gray-500 truncate">{worker.email}</p>
           </div>
         </div>
-        <div className="text-right flex items-center gap-3">
-          <div>
-            <p className="text-xl font-bold text-red-600 leading-none">{productCount}</p>
-            <p className="text-[10px] text-gray-400">টি লিস্টিং</p>
-          </div>
-          <button onClick={() => onDeleteWorker(worker.id)} className="text-red-500 hover:text-red-700 p-1 transition-colors" title="কর্মী প্রোফাইল মুছুন">
-            <Trash2 className="h-4 w-4" />
-          </button>
+        <button onClick={() => onDeleteWorker(worker.id)} className="text-red-500 hover:text-red-700 p-1 transition-colors shrink-0" title="কর্মী প্রোফাইল মুছুন">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white rounded-lg border p-3">
+          <p className="text-[10px] text-gray-400">বর্তমান লিমিট</p>
+          <p className={`text-lg font-bold ${limitReached ? 'text-red-600' : 'text-gray-800'}`}>
+            {listingLimit === null ? '∞' : `${cycleUsed} / ${listingLimit}`}
+          </p>
+          <p className="text-[10px] text-gray-400">{limitReached ? 'লিমিট শেষ' : 'চলতি সাইকেল'}</p>
+        </div>
+        <div className="bg-white rounded-lg border p-3">
+          <p className="text-[10px] text-gray-400">মোট লিস্টিং</p>
+          <p className="text-lg font-bold text-indigo-600">{lifetimeListings}</p>
+          <p className="text-[10px] text-gray-400">শুরু থেকে আজ পর্যন্ত</p>
         </div>
       </div>
+
+      {listingLimit !== null && listingLimit > 0 && (
+        <div>
+          <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+            <span>চলতি লিমিটের অগ্রগতি</span><span>{progress}%</span>
+          </div>
+          <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${limitReached ? 'bg-red-600' : 'bg-green-500'}`} style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
@@ -1570,7 +1609,7 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] font-medium text-gray-600 mb-1">লিস্টিং টার্গেট</label>
+          <label className="block text-[11px] font-medium text-gray-600 mb-1">লিস্টিং লিমিট</label>
           <input type="number" min="0" value={listingTarget} onChange={(e) => setListingTarget(e.target.value)}
             placeholder="যেমনঃ 100" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
         </div>
@@ -1581,8 +1620,10 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-1">
-        <p className="text-xs text-gray-500">মোট আয়: <span className="font-bold text-red-600">৳ {earned}</span></p>
+      {limitReached && <p className="text-xs font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">এই কর্মীর বর্তমান লিস্টিং লিমিট শেষ। নতুন লিমিট সেট করলে নতুন সাইকেল শুরু হবে।</p>}
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <p className="text-xs text-gray-500">চলতি আয়: <span className="font-bold text-red-600">৳ {currentEarnings}</span></p>
         <button onClick={onSave} disabled={saving}
           className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all duration-150 active:scale-95 disabled:opacity-60 disabled:active:scale-100">
           {saving ? 'সেভ হচ্ছে...' : saved ? 'সেভ হয়েছে ✓' : 'সেটিংস সংরক্ষণ করুন'}
@@ -1634,17 +1675,22 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     }
   };
 
-  // --- টার্গেট, আয় ও উত্তোলনের হিসাব (সব admin-এর সেট করা তথ্য থেকে লাইভ হিসাব হয়) ---
-  const listingsDone = myProducts.length;
-  const listingTarget = Number(workerProfile?.listingTarget) || 0;
+  // --- চলতি লিমিট, আজীবন লিস্টিং ও উত্তোলনের হিসাব ---
+  // Stored counters are used instead of myProducts.length because deleting a product
+  // must never give a worker a new quota slot or erase lifetime listing history.
+  const legacyProductCount = myProducts.length;
+  const listingsDone = Number(workerProfile?.listingUsed ?? legacyProductCount);
+  const lifetimeListings = Number(workerProfile?.lifetimeListings ?? legacyProductCount);
+  const listingTarget = workerProfile?.listingTarget == null || workerProfile?.listingTarget === ''
+    ? null : Number(workerProfile.listingTarget);
   const ratePerListing = Number(workerProfile?.ratePerListing) || 0;
-  const totalEarned = listingsDone * ratePerListing;
-  const paidAmount = myWithdrawalRequests.filter((r) => r.status === 'paid').reduce((s, r) => s + Number(r.amount || 0), 0);
-  const pendingAmount = myWithdrawalRequests.filter((r) => r.status === 'pending').reduce((s, r) => s + Number(r.amount || 0), 0);
-  const availableBalance = Math.max(0, totalEarned - paidAmount - pendingAmount);
-  const hasPendingRequest = myWithdrawalRequests.some((r) => r.status === 'pending');
+  const currentEarnings = Number(workerProfile?.currentEarnings ?? (listingsDone * ratePerListing));
+  const pendingAmount = Number(workerProfile?.pendingWithdrawal || 0);
+  const availableBalance = Math.max(0, currentEarnings - pendingAmount);
+  const hasPendingRequest = pendingAmount > 0 || myWithdrawalRequests.some((r) => r.status === 'pending');
   const canWithdraw = availableBalance >= 500 && !hasPendingRequest;
-  const targetPct = listingTarget > 0 ? Math.min(100, Math.round((listingsDone / listingTarget) * 100)) : 0;
+  const limitReached = listingTarget !== null && listingsDone >= listingTarget;
+  const targetPct = listingTarget !== null && listingTarget > 0 ? Math.min(100, Math.round((listingsDone / listingTarget) * 100)) : 0;
 
   const onWithdraw = async () => {
     if (!canWithdraw) return;
@@ -1652,6 +1698,8 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     setWithdrawing(true);
     try {
       await handleRequestWithdrawal(availableBalance);
+    } catch (err) {
+      alert(err?.message || 'উইথড্রও রিকোয়েস্ট পাঠাতে সমস্যা হয়েছে।');
     } finally {
       setWithdrawing(false);
     }
@@ -1671,7 +1719,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
     } catch (err) {
-      alert('প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
+      alert(err?.message || 'প্রোডাক্ট সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
     } finally {
       setSaving(false);
     }
@@ -1755,6 +1803,14 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
 
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
                 <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
+                  <Award className="h-4 w-4" /> মোট লিস্টিং
+                </div>
+                <p className="text-2xl font-bold text-indigo-600">{lifetimeListings}</p>
+                <p className="text-[10px] text-gray-400 mt-1">লিস্টিং শুরু থেকে আজ পর্যন্ত</p>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
+                <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-2">
                   <Wallet className="h-4 w-4" /> জমা হওয়া টাকা
                 </div>
                 <p className="text-lg font-bold text-red-600 mb-2">৳ {availableBalance}</p>
@@ -1770,6 +1826,11 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6 max-w-2xl">
               <h3 className="text-lg font-bold mb-4">নতুন প্রোডাক্ট যোগ করুন</h3>
+              {limitReached && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <strong>লিস্টিং লিমিট শেষ।</strong> এই সাইকেলে আর নতুন প্রোডাক্ট যোগ করা যাবে না। অ্যাডমিন নতুন লিমিট সেট করলে আবার listing করা যাবে।
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">প্রোডাক্টের নাম</label>
@@ -1858,10 +1919,44 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                   )}
                 </div>
 
-                <button type="submit" disabled={saving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
-                  {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন ও পাবলিশ করুন'}
+                <button type="submit" disabled={saving || limitReached} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                  {limitReached ? 'লিস্টিং লিমিট শেষ' : saving ? 'সেভ হচ্ছে...' : 'সেভ করুন ও পাবলিশ করুন'}
                 </button>
               </form>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="text-lg font-bold">উইথড্রও হিস্টোরি</h3>
+                <span className="text-xs text-gray-400">সর্বনিম্ন ৳৫০০</span>
+              </div>
+              {myWithdrawalRequests.length === 0 ? (
+                <p className="text-sm text-gray-500">এখনো কোনো উইথড্রও রিকোয়েস্ট নেই।</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="bg-gray-50 text-gray-500 text-xs border-y border-gray-200">
+                      <th className="p-3">তারিখ</th><th className="p-3">পরিমাণ</th><th className="p-3">স্ট্যাটাস</th>
+                    </tr></thead>
+                    <tbody>
+                      {myWithdrawalRequests.map((r) => {
+                        const d = toJsDate(r.createdAt);
+                        return (
+                          <tr key={r.id} className="border-b border-gray-100">
+                            <td className="p-3 text-xs text-gray-600">{d ? d.toLocaleString('bn-BD') : '—'}</td>
+                            <td className="p-3 text-sm font-bold text-red-600">৳ {Number(r.amount || 0).toLocaleString('en-BD')}</td>
+                            <td className="p-3">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${r.status === 'paid' ? 'bg-green-100 text-green-700' : r.status === 'rejected' ? 'bg-gray-200 text-gray-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {r.status === 'paid' ? 'পরিশোধিত' : r.status === 'rejected' ? 'বাতিল' : 'অপেক্ষমান'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
@@ -1979,7 +2074,8 @@ export default function App() {
   }, []);
 
   // Figure out whether the logged-in (non-admin) user is a worker or a regular
-  // customer, and load their profile (name/phone, or worker name) accordingly.
+  // customer. Worker profiles are listened to in real time so admin limit changes
+  // and automatic post-withdrawal resets appear immediately on the worker dashboard.
   useEffect(() => {
     if (!authUser || authUser.email === ADMIN_EMAIL) {
       setCustomerProfile(null);
@@ -1987,19 +2083,38 @@ export default function App() {
       setProfileChecked(true);
       return;
     }
+
     setProfileChecked(false);
+    let workerUnsub = null;
+    let cancelled = false;
+
     (async () => {
-      const workerSnap = await getDoc(doc(db, 'workers', authUser.uid));
+      const workerRef = doc(db, 'workers', authUser.uid);
+      const workerSnap = await getDoc(workerRef);
+      if (cancelled) return;
+
       if (workerSnap.exists()) {
-        setWorkerProfile({ id: authUser.uid, ...workerSnap.data() });
         setCustomerProfile(null);
+        workerUnsub = onSnapshot(workerRef, (snap) => {
+          if (snap.exists()) setWorkerProfile({ id: authUser.uid, ...snap.data() });
+          else setWorkerProfile(null);
+          setProfileChecked(true);
+        });
       } else {
         setWorkerProfile(null);
         const custSnap = await getDoc(doc(db, 'customers', authUser.uid));
+        if (cancelled) return;
         setCustomerProfile(custSnap.exists() ? custSnap.data() : null);
+        setProfileChecked(true);
       }
-      setProfileChecked(true);
-    })();
+    })().catch(() => {
+      if (!cancelled) setProfileChecked(true);
+    });
+
+    return () => {
+      cancelled = true;
+      if (workerUnsub) workerUnsub();
+    };
   }, [authUser]);
 
   // Live list of all worker accounts — needed for the admin panel's Workers tab
@@ -2138,6 +2253,8 @@ export default function App() {
     await updateProfile(cred.user, { displayName: name });
     await setDoc(doc(db, 'workers', cred.user.uid), {
       name, email, createdAt: serverTimestamp(),
+      listingUsed: 0, lifetimeListings: 0, currentEarnings: 0, pendingWithdrawal: 0,
+      cycleStartedAt: serverTimestamp(),
     });
     await signOut(secondaryAuth);
   };
@@ -2170,17 +2287,63 @@ export default function App() {
   };
 
   // --- WORKER PRODUCT LISTING ---
+  // Listing quota is enforced inside a Firestore transaction so two browser tabs
+  // cannot bypass the limit by submitting at the same time. The worker document
+  // keeps the current-cycle count/earnings and the lifetime listing count.
   const handleAddWorkerProduct = async ({ title, price, category, image, sizes, colors }) => {
-    await addDoc(collection(db, 'products'), {
-      title,
-      price,
-      category,
-      image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
-      sizes,
-      colors,
-      createdAt: serverTimestamp(),
-      createdBy: authUser.uid,
-      createdByName: workerProfile?.name || authUser.email,
+    if (!authUser?.uid) throw new Error('Worker session not found.');
+
+    const workerRef = doc(db, 'workers', authUser.uid);
+    const productRef = doc(collection(db, 'products'));
+
+    await runTransaction(db, async (transaction) => {
+      const workerSnap = await transaction.get(workerRef);
+      if (!workerSnap.exists()) throw new Error('কর্মী প্রোফাইল পাওয়া যায়নি।');
+
+      const worker = workerSnap.data();
+      const limit = worker.listingTarget == null || worker.listingTarget === ''
+        ? null
+        : Number(worker.listingTarget);
+
+      // Backfill legacy worker documents once. Existing products count as the
+      // current-cycle usage and lifetime total so an old worker cannot bypass a limit.
+      let used = worker.listingUsed == null ? null : Number(worker.listingUsed);
+      let lifetime = worker.lifetimeListings == null ? null : Number(worker.lifetimeListings);
+      if (used === null || lifetime === null) {
+        const existingSnap = await transaction.get(
+          query(collection(db, 'products'), where('createdBy', '==', authUser.uid))
+        );
+        const existingCount = existingSnap.size;
+        used = used === null ? existingCount : used;
+        lifetime = lifetime === null ? existingCount : lifetime;
+      }
+
+      if (limit !== null && used >= limit) {
+        throw new Error(`লিস্টিং লিমিট শেষ। বর্তমান লিমিট ${limit} টি।`);
+      }
+
+      const rate = Number(worker.ratePerListing || 0);
+      const nextUsed = used + 1;
+      lifetime = lifetime + 1;
+      const currentEarnings = Number(worker.currentEarnings || 0) + rate;
+
+      transaction.set(productRef, {
+        title,
+        price,
+        category,
+        image: image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
+        sizes,
+        colors,
+        createdAt: serverTimestamp(),
+        createdBy: authUser.uid,
+        createdByName: worker.name || workerProfile?.name || authUser.email,
+      });
+
+      transaction.update(workerRef, {
+        listingUsed: nextUsed,
+        lifetimeListings: lifetime,
+        currentEarnings,
+      });
     });
   };
 
@@ -2188,31 +2351,88 @@ export default function App() {
     await deleteDoc(doc(db, 'products', productId));
   };
 
-  // Admin sets/updates a worker's assigned category, listing target, and per-listing rate.
-  const handleUpdateWorkerSettings = async (workerId, { assignedCategory, listingTarget, ratePerListing }) => {
-    await updateDoc(doc(db, 'workers', workerId), {
-      assignedCategory: assignedCategory || null,
-      listingTarget: listingTarget === '' || listingTarget === null ? null : Number(listingTarget),
-      ratePerListing: ratePerListing === '' || ratePerListing === null ? null : Number(ratePerListing),
+  // Admin sets/updates a worker's category, listing limit, and per-listing rate.
+  // If the worker has already exhausted the old limit, assigning a new limit starts
+  // a fresh cycle. Lifetime listings are never reset.
+  const handleUpdateWorkerSettings = async (workerId, { assignedCategory, listingTarget, ratePerListing, currentListingUsed = 0, currentLifetimeListings = 0 }) => {
+    const workerRef = doc(db, 'workers', workerId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(workerRef);
+      if (!snap.exists()) throw new Error('কর্মী প্রোফাইল পাওয়া যায়নি।');
+      const current = snap.data();
+      const oldLimit = current.listingTarget == null || current.listingTarget === '' ? null : Number(current.listingTarget);
+      const oldUsed = current.listingUsed == null ? Number(currentListingUsed || 0) : Number(current.listingUsed);
+      const newLimit = listingTarget === '' || listingTarget === null ? null : Math.max(0, Number(listingTarget));
+      const exhausted = oldLimit !== null && oldUsed >= oldLimit;
+
+      transaction.update(workerRef, {
+        assignedCategory: assignedCategory || null,
+        listingTarget: newLimit,
+        ratePerListing: ratePerListing === '' || ratePerListing === null ? null : Math.max(0, Number(ratePerListing)),
+        listingUsed: exhausted && newLimit !== null ? 0 : (current.listingUsed == null ? Number(currentListingUsed || 0) : Number(current.listingUsed)),
+        lifetimeListings: current.lifetimeListings == null ? Number(currentLifetimeListings || 0) : Number(current.lifetimeListings),
+        currentEarnings: current.currentEarnings == null ? Number(currentListingUsed || 0) * (ratePerListing === '' || ratePerListing === null ? 0 : Math.max(0, Number(ratePerListing))) : Number(current.currentEarnings || 0),
+        ...(exhausted && newLimit !== null ? { currentEarnings: 0, cycleStartedAt: serverTimestamp() } : {}),
+      });
     });
   };
 
-  // Worker requests to withdraw their currently available balance.
+
+  // Worker requests to withdraw the current cycle's available balance.
   const handleRequestWithdrawal = async (amount) => {
-    await addDoc(collection(db, 'withdrawalRequests'), {
-      workerId: authUser.uid,
-      workerName: workerProfile?.name || authUser.email,
-      amount,
-      status: 'pending',
-      createdAt: serverTimestamp(),
+    const numericAmount = Number(amount || 0);
+    if (numericAmount < 500) throw new Error('সর্বনিম্ন ৳৫০০ উত্তোলন করা যাবে।');
+    if (!authUser?.uid) throw new Error('Worker session not found.');
+
+    const workerRef = doc(db, 'workers', authUser.uid);
+    const withdrawalRef = doc(collection(db, 'withdrawalRequests'));
+    await runTransaction(db, async (transaction) => {
+      const workerSnap = await transaction.get(workerRef);
+      if (!workerSnap.exists()) throw new Error('কর্মী প্রোফাইল পাওয়া যায়নি।');
+      const worker = workerSnap.data();
+      const currentEarnings = Number(worker.currentEarnings || 0);
+      const pending = Number(worker.pendingWithdrawal || 0);
+      const available = Math.max(0, currentEarnings - pending);
+      if (available < 500) throw new Error('উত্তোলনের জন্য কমপক্ষে ৳৫০০ জমা থাকতে হবে।');
+      if (pending > 0) throw new Error('একটি উত্তোলনের অনুরোধ ইতিমধ্যে অপেক্ষমান আছে।');
+
+      transaction.set(withdrawalRef, {
+        workerId: authUser.uid,
+        workerName: worker.name || workerProfile?.name || authUser.email,
+        amount: available,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      transaction.update(workerRef, { pendingWithdrawal: available });
     });
   };
 
-  // Admin marks a withdrawal request as paid or rejected.
+  // Admin marks a withdrawal request as paid or rejected. A PAID withdrawal
+  // closes the current earning cycle and resets its limit counter automatically;
+  // lifetimeListings remains untouched. A rejected request returns the balance.
   const handleProcessWithdrawal = async (requestId, status) => {
-    await updateDoc(doc(db, 'withdrawalRequests', requestId), {
-      status,
-      processedAt: serverTimestamp(),
+    const requestRef = doc(db, 'withdrawalRequests', requestId);
+    await runTransaction(db, async (transaction) => {
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists()) throw new Error('উত্তোলনের অনুরোধ পাওয়া যায়নি।');
+      const request = requestSnap.data();
+      if (request.status !== 'pending') return;
+
+      const workerRef = doc(db, 'workers', request.workerId);
+      const workerSnap = await transaction.get(workerRef);
+      if (!workerSnap.exists()) throw new Error('কর্মী প্রোফাইল পাওয়া যায়নি।');
+
+      transaction.update(requestRef, { status, processedAt: serverTimestamp() });
+      if (status === 'paid') {
+        transaction.update(workerRef, {
+          listingUsed: 0,
+          currentEarnings: 0,
+          pendingWithdrawal: 0,
+          cycleStartedAt: serverTimestamp(),
+        });
+      } else {
+        transaction.update(workerRef, { pendingWithdrawal: 0 });
+      }
     });
   };
 
