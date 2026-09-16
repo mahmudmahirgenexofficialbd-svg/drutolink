@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import logoAsset from './src/assets/drutolink-logo.png';
+import slide1Asset from './src/assets/slide1.jpg';
+import slide2Asset from './src/assets/slide2.jpg';
+import slide3Asset from './src/assets/slide3.jpg';
+import productPlaceholderAsset from './src/assets/product-placeholder.svg';
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
@@ -22,7 +27,7 @@ import {
 const ADMIN_EMAIL = 'admin@drutolink.com';
 
 // সাইটের লোগো — সব হেডার/সাইডবার/ফুটার এই একই লিংক থেকে লোগো দেখায়
-const LOGO_URL = '/logo.png';
+const LOGO_URL = logoAsset;
 
 // অর্ডারের ধাপগুলো — ঠিক এই ক্রমে, AdminDashboard-এর স্ট্যাটাস ড্রপডাউনের সাথে মিলিয়ে
 // একটা এলিমেন্ট স্ক্রল করে চোখের সামনে এলে true হয়ে যায় — নিচের দিকের সেকশনগুলোকে
@@ -45,7 +50,38 @@ function useInView(threshold = 0.25) {
   return [ref, inView];
 }
 
-const ORDER_STAGES = ['Pending TrxID', 'Order Placed', 'Sourced in China', 'Delivered'];
+const SHIPPING_RATE_PER_KG = 900;
+
+// Product-level weight is preferred. For legacy products that don't have a weight yet,
+// use a conservative category-based estimate so the cart can still show an approximate
+// shipping amount. Admin can set the product's own estimated weight at any time.
+const CATEGORY_WEIGHT_ESTIMATES = {
+  'ইলেকট্রনিক্স': 0.35,
+  'ফ্যাশন ও পোশাক': 0.45,
+  'জুতা': 0.75,
+  'ব্যাগ ও লাগেজ': 0.80,
+  'হোম ও কিচেন': 0.65,
+  'খেলনা ও গিফট': 0.40,
+  'বিউটি ও কসমেটিক্স': 0.25,
+  'মোবাইল এক্সেসরিজ': 0.20,
+};
+
+function getEstimatedWeightKg(product) {
+  const explicit = Number(product?.estimatedWeightKg ?? product?.weightKg ?? product?.weight);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return Number(CATEGORY_WEIGHT_ESTIMATES[product?.category] || 0.50);
+}
+
+const ORDER_STAGES = [
+  'Pending TrxID',
+  'Order Placed',
+  'Processing',
+  'Sourced in China',
+  'In Transit',
+  'Arrived in Bangladesh',
+  'Out for Delivery',
+  'Delivered'
+];
 
 // --- "৩ ধাপে অর্ডার করুন" সেকশনের কার্টুন-স্টাইল আইকন ---
 // সহজ, ফ্ল্যাট শেপ দিয়ে আঁকা (কোনো ইমেজ ফাইল লাগে না), প্রতিটা নিজের রঙে —
@@ -208,9 +244,9 @@ const CATEGORIES = [
 ];
 
 const SLIDES = [
-  { image: '/slide1.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং' },
-  { image: '/slide2.jpg', alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
-  { image: '/slide3.jpg', alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
+  { image: slide1Asset, alt: 'চায়না টু বাংলাদেশ শিপিং' },
+  { image: slide2Asset, alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
+  { image: slide3Asset, alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
 ];
 
 // --- IMAGE SLIDER ---
@@ -278,7 +314,7 @@ function RouteGraphic() {
 }
 
 // --- SIDE CART DRAWER (opens on Add to Cart, and from the header cart icon) ---
-function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTotal, onCheckout }) {
+function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTotal, estimatedWeightKg, estimatedShipping, estimatedGrandTotal, onCheckout }) {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   return (
     <>
@@ -348,9 +384,24 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
 
         {cart.length > 0 && (
           <div className="border-t border-gray-100 p-5 space-y-3 shrink-0 bg-gray-50/50">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-gray-700">সর্বমোট</span>
-              <span className="font-display text-red-700 font-bold text-lg">৳ {cartTotal}</span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">পণ্যের মোট</span>
+              <span className="font-semibold text-gray-800">৳ {cartTotal.toLocaleString('en-BD')}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">আনুমানিক ওজন</span>
+              <span className="font-semibold text-gray-800">{estimatedWeightKg.toFixed(2)} KG</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">আনুমানিক Shipping</span>
+              <span className="font-semibold text-gray-800">৳ {estimatedShipping.toLocaleString('en-BD')}</span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+              <span className="font-bold text-gray-700">আনুমানিক মোট</span>
+              <span className="font-display text-red-700 font-bold text-lg">৳ {estimatedGrandTotal.toLocaleString('en-BD')}</span>
+            </div>
+            <div className="text-[11px] leading-5 text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <strong>বিঃদ্রঃ</strong> এখানে দেখানো ওজন ও Shipping Charge আনুমানিক। পণ্য বাংলাদেশে পৌঁছানোর পর প্রকৃত ওজন অনুযায়ী চূড়ান্ত Shipping Charge আপনার অর্ডারে যোগ করা হবে। Shipping Rate: <strong>৳ {SHIPPING_RATE_PER_KG}/kg</strong>।
             </div>
             <button onClick={onCheckout} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98]">
               চেকআউটে যান
@@ -511,7 +562,8 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
 
 // --- ORDER STATUS TIMELINE ---
 function OrderStatusTimeline({ status }) {
-  const currentIndex = Math.max(0, ORDER_STAGES.indexOf(status));
+  const stageIndex = ORDER_STAGES.indexOf(status);
+  const currentIndex = Math.max(0, stageIndex === -1 ? 0 : stageIndex);
   return (
     <div className="flex items-center w-full">
       {ORDER_STAGES.map((stage, i) => {
@@ -985,7 +1037,7 @@ function OverviewTab({ products, orders, workers, withdrawalRequests }) {
   );
 }
 
-function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal }) {
+function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal, handleUpdateOrderShipping }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
 
@@ -1023,6 +1075,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   };
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
+  const [estimatedWeightKg, setEstimatedWeightKg] = useState('');
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
@@ -1075,8 +1128,10 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
       const data = {
         title,
         price,
+        estimatedWeightKg: Number(estimatedWeightKg) > 0 ? Number(estimatedWeightKg) : null,
         category,
-        image: image || '/product-placeholder.svg',
+        image: image || 'productPlaceholderAsset',
+        estimatedWeightKg: Number(estimatedWeightKg) > 0 ? Number(estimatedWeightKg) : null,
         sizes,
         colors,
       };
@@ -1093,7 +1148,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
         alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
       }
       setEditingProductId(null);
-      setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+      setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage(''); setCategory(CATEGORIES[0].name);
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       setActiveTab('orders');
     } catch (err) {
@@ -1108,6 +1163,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     setEditingProductId(p.id);
     setTitle(p.title || '');
     setPrice(p.price || '');
+    setEstimatedWeightKg(p.estimatedWeightKg || '');
     setImage(p.image || '');
     setCategory(p.category || CATEGORIES[0].name);
     setSizes(p.sizes || []);
@@ -1117,7 +1173,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
 
   const handleCancelEditProduct = () => {
     setEditingProductId(null);
-    setTitle(''); setPrice(''); setImage(''); setCategory(CATEGORIES[0].name);
+    setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage(''); setCategory(CATEGORIES[0].name);
     setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
   };
 
@@ -1127,6 +1183,22 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
 
   const handleUpdateStatus = async (orderId, status) => {
     await updateDoc(doc(db, 'orders', orderId), { status });
+  };
+
+  const handleUpdateOrderShipping = async (orderId, actualWeightKg) => {
+    const weight = Number(actualWeightKg);
+    if (!Number.isFinite(weight) || weight <= 0) throw new Error('সঠিক প্রকৃত ওজন দিন।');
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) throw new Error('অর্ডার পাওয়া যায়নি।');
+    const productSubtotal = Number(order.productSubtotal ?? order.totalPrice ?? 0);
+    const finalShippingCharge = Math.round(weight * SHIPPING_RATE_PER_KG);
+    await updateDoc(doc(db, 'orders', orderId), {
+      actualWeightKg: weight,
+      finalShippingCharge,
+      totalPrice: productSubtotal + finalShippingCharge,
+      shippingRatePerKg: SHIPPING_RATE_PER_KG,
+      shippingFinalizedAt: serverTimestamp(),
+    });
   };
 
   return (
@@ -1207,6 +1279,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                     <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
                       <th className="p-4 font-medium">প্রোডাক্ট</th>
                       <th className="p-4 font-medium">পেমেন্ট (TrxID)</th>
+                      <th className="p-4 font-medium">ডেলিভারি / শিপিং</th>
                       <th className="p-4 font-medium">স্ট্যাটাস</th>
                       <th className="p-4 font-medium">অ্যাকশন</th>
                     </tr>
@@ -1227,7 +1300,8 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                               )}
                             </p>
                           ))}
-                          <p className="text-xs text-red-600 font-bold mt-1">মোট ৳ {o.totalPrice}</p>
+                          <p className="text-[11px] text-gray-400 font-mono mt-2">{o.orderNumber || `DL-${o.id?.slice(0,8)?.toUpperCase()}`}</p>
+                          <p className="text-xs text-red-600 font-bold mt-1">মোট ৳ {Number(o.totalPrice || 0).toLocaleString('en-BD')}</p>
                         </td>
                         <td className="p-4">
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold mb-1 ${o.paymentMethod === 'bkash' ? 'bg-pink-100 text-pink-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -1236,13 +1310,26 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                           <p className="font-mono text-sm">{o.trxId}</p>
                           <p className="text-[11px] text-gray-500">A/C: {o.accountNumber}</p>
                         </td>
+                        <td className="p-4 min-w-[230px]">
+                          <p className="text-xs text-gray-500 mb-1">আনুমানিক: {Number(o.estimatedWeightKg || 0).toFixed(2)} KG · ৳ {Number(o.estimatedShippingCharge || 0).toLocaleString('en-BD')}</p>
+                          <p className="text-xs text-gray-600 mb-2">ডেলিভারি: {o.deliveryAddress?.district || '—'}{o.deliveryAddress?.area ? `, ${o.deliveryAddress.area}` : ''}</p>
+                          <div className="flex gap-2">
+                            <input type="number" min="0.01" step="0.01" defaultValue={o.actualWeightKg || ''} placeholder="প্রকৃত KG"
+                              id={`actual-weight-${o.id}`} className="w-24 border border-gray-200 rounded px-2 py-1.5 text-xs" />
+                            <button onClick={async () => {
+                              const el = document.getElementById(`actual-weight-${o.id}`);
+                              try { await handleUpdateOrderShipping(o.id, el?.value); alert('প্রকৃত ওজন ও Shipping Charge আপডেট হয়েছে।'); }
+                              catch (err) { alert(err?.message || 'Shipping আপডেট করা যায়নি।'); }
+                            }} className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold px-2.5 py-1.5 rounded">ওজন সেভ</button>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            চূড়ান্ত: {o.actualWeightKg ? `${Number(o.actualWeightKg).toFixed(2)} KG · ৳ ${Number(o.finalShippingCharge || 0).toLocaleString('en-BD')}` : 'এখনো নির্ধারণ করা হয়নি'}
+                          </p>
+                        </td>
                         <td className="p-4">
                           <select value={o.status} onChange={(e) => handleUpdateStatus(o.id, e.target.value)}
                             className="bg-gray-50 border border-gray-200 text-sm rounded p-2">
-                            <option>Pending TrxID</option>
-                            <option>Order Placed</option>
-                            <option>Sourced in China</option>
-                            <option>Delivered</option>
+                            {ORDER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}
                           </select>
                         </td>
                         <td className="p-4">
@@ -1282,6 +1369,12 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                     <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
                     <input type="number" value={price} onChange={(e) => setPrice(e.target.value)}
                       className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="2500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">আনুমানিক ওজন (KG)</label>
+                    <input type="number" min="0.01" step="0.01" value={estimatedWeightKg} onChange={(e) => setEstimatedWeightKg(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ 0.50" />
+                    <p className="text-[11px] text-gray-400 mt-1">কার্টের আনুমানিক Shipping Charge হিসাবের জন্য ব্যবহার হবে।</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
@@ -1637,6 +1730,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
+  const [estimatedWeightKg, setEstimatedWeightKg] = useState('');
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(workerProfile?.assignedCategory || CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
@@ -1712,8 +1806,8 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     }
     setSaving(true);
     try {
-      await handleAddWorkerProduct({ title, price, category, image, sizes, colors });
-      setTitle(''); setPrice(''); setImage('');
+      await handleAddWorkerProduct({ title, price, category, image, sizes, colors, estimatedWeightKg });
+      setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage('');
       setCategory(workerProfile?.assignedCategory || CATEGORIES[0].name); // ফিক্স: নির্ধারিত ক্যাটাগরি থাকলে সেটাতেই ফিরবে, ভুল করে CATEGORIES[0]-এ চলে যাবে না
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
@@ -1853,6 +1947,12 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                   <label className="block text-sm font-medium text-gray-700 mb-1">দাম (টাকা)</label>
                   <input type="number" value={price} onChange={(e) => setPrice(e.target.value)}
                     className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="2500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">আনুমানিক ওজন (KG)</label>
+                  <input type="number" min="0.01" step="0.01" value={estimatedWeightKg} onChange={(e) => setEstimatedWeightKg(e.target.value)}
+                    className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ 0.50" />
+                  <p className="text-[11px] text-gray-400 mt-1">কার্টে আনুমানিক Shipping হিসাবের জন্য ব্যবহার হবে।</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
@@ -2004,6 +2104,10 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [accountNumber, setAccountNumber] = useState('');
   const [trxId, setTrxId] = useState('');
+  const [deliveryDistrict, setDeliveryDistrict] = useState('');
+  const [deliveryArea, setDeliveryArea] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [staffMenuOpen, setStaffMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false); // মোবাইলে হেডারের ৩-বার আইকনে ক্লিক করলে এই ড্রয়ার খোলে
@@ -2022,23 +2126,19 @@ export default function App() {
   }, [currentView]);
 
   const [products, setProducts] = useState([]);
-  const [orders, setOrders] = useState([]);
   const [productsLoadError, setProductsLoadError] = useState(false);
+  const [orders, setOrders] = useState([]);
 
-  // Real-time product feed from Firestore. A Firestore/network error must never
-  // prevent the storefront shell from rendering; the UI can continue to work
-  // and show a small retry message instead of becoming a blank/blocked page.
+  // Real-time product feed from Firestore — visible to every visitor, not just this browser
   useEffect(() => {
-    let mounted = true;
     const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      if (!mounted) return;
       setProductsLoadError(false);
       setProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => {
-      if (mounted) setProductsLoadError(true);
+      setProductsLoadError(true);
     });
-    return () => { mounted = false; unsub(); };
+    return () => unsub();
   }, []);
 
   // ছবি দিয়ে প্রোডাক্ট খোঁজা — পুরোটাই ব্রাউজারে চলে, কোনো API লাগে না (visualSearch.ts দেখুন)
@@ -2303,7 +2403,7 @@ export default function App() {
   // Listing quota is enforced inside a Firestore transaction so two browser tabs
   // cannot bypass the limit by submitting at the same time. The worker document
   // keeps the current-cycle count/earnings and the lifetime listing count.
-  const handleAddWorkerProduct = async ({ title, price, category, image, sizes, colors }) => {
+  const handleAddWorkerProduct = async ({ title, price, category, image, sizes, colors, estimatedWeightKg }) => {
     if (!authUser?.uid) throw new Error('Worker session not found.');
 
     const workerRef = doc(db, 'workers', authUser.uid);
@@ -2344,7 +2444,7 @@ export default function App() {
         title,
         price,
         category,
-        image: image || '/product-placeholder.svg',
+        image: image || 'productPlaceholderAsset',
         sizes,
         colors,
         createdAt: serverTimestamp(),
@@ -2475,6 +2575,9 @@ export default function App() {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const estimatedCartWeightKg = cart.reduce((sum, item) => sum + getEstimatedWeightKg(item) * Number(item.quantity || 0), 0);
+  const estimatedShippingCharge = Math.round(estimatedCartWeightKg * SHIPPING_RATE_PER_KG);
+  const estimatedGrandTotal = cartTotal + estimatedShippingCharge;
 
   const handleConfirmOrder = async () => {
     if (cart.length === 0) return;
@@ -2486,18 +2589,44 @@ export default function App() {
       return;
     }
 
+    if (!deliveryDistrict || !deliveryAddress || !deliveryPhone) {
+      alert('অনুগ্রহ করে ডেলিভারি জেলা, সম্পূর্ণ ঠিকানা ও মোবাইল নম্বর দিন।');
+      return;
+    }
     if (!accountNumber || !trxId) {
       alert('অনুগ্রহ করে আপনার একাউন্ট নাম্বার ও ট্রানজেকশন আইডি দিন।');
       return;
     }
     setOrderSubmitting(true);
     try {
-      await addDoc(collection(db, 'orders'), {
-        items: cart.map((item) => ({ title: item.title, price: item.price, quantity: item.quantity, image: item.image, selectedSize: item.selectedSize || null, selectedColor: item.selectedColor || null })),
-        totalPrice: cartTotal,
+      const orderRef = doc(collection(db, 'orders'));
+      await setDoc(orderRef, {
+        items: cart.map((item) => ({
+          title: item.title,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          estimatedWeightKg: getEstimatedWeightKg(item),
+          selectedSize: item.selectedSize || null,
+          selectedColor: item.selectedColor || null
+        })),
+        orderNumber: `DL-${orderRef.id.slice(0, 8).toUpperCase()}`,
+        productSubtotal: cartTotal,
+        estimatedWeightKg: Number(estimatedCartWeightKg.toFixed(3)),
+        estimatedShippingCharge,
+        shippingRatePerKg: SHIPPING_RATE_PER_KG,
+        finalShippingCharge: null,
+        actualWeightKg: null,
+        totalPrice: estimatedGrandTotal,
         paymentMethod,
         accountNumber,
         trxId,
+        deliveryAddress: {
+          district: deliveryDistrict,
+          area: deliveryArea || null,
+          address: deliveryAddress,
+          phone: deliveryPhone
+        },
         status: 'Pending TrxID',
         createdAt: serverTimestamp(),
         customerId: authUser.uid,
@@ -2505,9 +2634,9 @@ export default function App() {
         customerEmail: authUser.email || '',
         customerPhone: customerProfile?.phone || null,
       });
-      alert('অর্ডার সফলভাবে দেওয়া হয়েছে! আমরা আপনার TrxID যাচাই করব।');
-      setAccountNumber(''); setTrxId(''); setCart([]);
-      setCurrentView('home');
+      alert(`অর্ডার সফলভাবে দেওয়া হয়েছে! আপনার Order ID: DL-${orderRef.id.slice(0, 8).toUpperCase()}`);
+      setAccountNumber(''); setTrxId(''); setDeliveryDistrict(''); setDeliveryArea(''); setDeliveryAddress(''); setDeliveryPhone(''); setCart([]);
+      setCurrentView('account');
     } catch (err) {
       alert('দুঃখিত, অর্ডার সাবমিট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     } finally {
@@ -2518,8 +2647,8 @@ export default function App() {
   const scrollToProducts = () => productsRef.current?.scrollIntoView({ behavior: 'smooth' });
   const scrollToHowItWorks = () => howItWorksRef.current?.scrollIntoView({ behavior: 'smooth' });
   const goToOrders = () => {
-    if (isCustomerLoggedIn) setCurrentView('account');
-    else { setRedirectAfterLogin('account'); setCurrentView('login'); }
+    if (isCustomerLoggedIn) setCurrentView('track');
+    else { setRedirectAfterLogin('track'); setCurrentView('login'); }
   };
 
   // ছবি-সার্চ চালু থাকলে সেটাই অগ্রাধিকার পায় — মিলের ক্রমে সাজানো ফল দেখায়।
@@ -2552,6 +2681,7 @@ export default function App() {
         handleUpdateWorkerSettings={handleUpdateWorkerSettings}
         withdrawalRequests={withdrawalRequests}
         handleProcessWithdrawal={handleProcessWithdrawal}
+        handleUpdateOrderShipping={handleUpdateOrderShipping}
       />
     );
   }
@@ -2644,6 +2774,62 @@ export default function App() {
     );
   }
 
+  if (currentView === 'track') {
+    if (!isCustomerLoggedIn) {
+      return <AuthPage mode="login" setMode={setCurrentView}
+        onLogin={async (credentials) => { setRedirectAfterLogin('track'); await handleCustomerLogin(credentials); }}
+        onSignup={async (credentials) => { setRedirectAfterLogin('track'); await handleCustomerSignup(credentials); }}
+        onGoogleLogin={async () => { setRedirectAfterLogin('track'); await handleGoogleLogin(); }}
+        authError={customerAuthError} authLoading={customerAuthLoading} goHome={() => setCurrentView('home')} />;
+    }
+    const myOrders = orders.filter((o) => o.customerId === authUser.uid);
+    return (
+      <div className="min-h-screen bg-gray-50 font-body">
+        <style>{FONTS}</style>
+        <header className="bg-red-700 text-white sticky top-0 z-40">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <button onClick={() => setCurrentView('home')} className="flex items-center gap-2 text-sm"><ArrowLeft className="h-4 w-4" /> স্টোরে ফিরুন</button>
+            <button onClick={() => setCurrentView('account')} className="text-sm bg-red-800 hover:bg-red-900 px-3 py-1.5 rounded-lg">আমার অর্ডার</button>
+          </div>
+        </header>
+        <main className="max-w-5xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-red-600">Order Tracking</p>
+            <h1 className="font-display text-3xl font-extrabold text-gray-900 mt-1">আপনার অর্ডার ট্র্যাক করুন</h1>
+            <p className="text-sm text-gray-500 mt-2">অর্ডারের বর্তমান অবস্থান ও Shipping তথ্য এক জায়গায় দেখুন।</p>
+          </div>
+          {myOrders.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-sm text-gray-500">আপনার এখনো কোনো অর্ডার নেই।</div>
+          ) : (
+            <div className="space-y-5">
+              {myOrders.map((o) => (
+                <div key={o.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex flex-wrap justify-between gap-3 mb-6">
+                    <div>
+                      <p className="text-xs text-gray-400">Order ID</p>
+                      <p className="font-mono font-bold text-gray-900">{o.orderNumber || `DL-${o.id?.slice(0,8)?.toUpperCase()}`}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">বর্তমান মোট</p>
+                      <p className="text-xl font-bold text-red-700">৳ {Number(o.totalPrice || 0).toLocaleString('en-BD')}</p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto pb-2"><div className="min-w-[720px]"><OrderStatusTimeline status={o.status} /></div></div>
+                  <div className="grid md:grid-cols-3 gap-3 mt-6">
+                    <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs text-gray-500">আনুমানিক ওজন</p><p className="font-bold mt-1">{Number(o.estimatedWeightKg || 0).toFixed(2)} KG</p></div>
+                    <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs text-gray-500">Shipping</p><p className="font-bold mt-1">৳ {Number(o.finalShippingCharge ?? o.estimatedShippingCharge ?? 0).toLocaleString('en-BD')}</p></div>
+                    <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs text-gray-500">ডেলিভারি</p><p className="font-bold mt-1">{o.deliveryAddress?.district || '—'}</p></div>
+                  </div>
+                  <p className="text-[11px] leading-5 text-gray-500 mt-4">Shipping Charge-এর চূড়ান্ত হিসাব পণ্য বাংলাদেশে পৌঁছানোর পর প্রকৃত ওজন অনুযায়ী নির্ধারণ করা হয়।</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
   if (currentView === 'account') {
     if (!isCustomerLoggedIn) {
       return (
@@ -2693,15 +2879,24 @@ export default function App() {
             <div className="space-y-4">
               {myOrders.map((o) => (
                 <div key={o.id} className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-5">
-                  <div className="flex justify-between items-start mb-4">
+                  <div className="flex justify-between items-start mb-4 gap-3">
                     <div>
+                      <p className="text-[11px] text-gray-400 font-mono mb-1">{o.orderNumber || `DL-${o.id?.slice(0, 8)?.toUpperCase()}`}</p>
                       {(o.items || []).map((it, idx) => (
                         <p key={idx} className="text-sm font-semibold">{it.title} × {it.quantity}</p>
                       ))}
                     </div>
-                    <span className="font-display text-red-700 font-bold">৳ {o.totalPrice}</span>
+                    <div className="text-right">
+                      <span className="font-display text-red-700 font-bold">৳ {Number(o.totalPrice || 0).toLocaleString('en-BD')}</span>
+                      <p className="text-[10px] text-gray-400 mt-1">{o.actualWeightKg ? `চূড়ান্ত ওজন ${Number(o.actualWeightKg).toFixed(2)} KG` : `আনুমানিক ${Number(o.estimatedWeightKg || 0).toFixed(2)} KG`}</p>
+                    </div>
                   </div>
                   <OrderStatusTimeline status={o.status} />
+                  <div className="mt-4 pt-3 border-t border-gray-100 grid sm:grid-cols-3 gap-2 text-xs text-gray-500">
+                    <span>পণ্য: ৳ {Number(o.productSubtotal || o.totalPrice || 0).toLocaleString('en-BD')}</span>
+                    <span>Shipping: ৳ {Number(o.finalShippingCharge ?? o.estimatedShippingCharge ?? 0).toLocaleString('en-BD')}</span>
+                    <span>{o.deliveryAddress?.district || 'ডেলিভারি ঠিকানা সংরক্ষিত'}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -2728,15 +2923,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white font-body text-gray-900">
-      {productsLoadError && (
-        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm px-4 py-2 text-center">
-          পণ্য লোড করতে সাময়িক সমস্যা হচ্ছে। সংযোগ ঠিক হলে তালিকা স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবে।
-        </div>
-      )}
       <style>{FONTS}</style>
 
       {/* ছবি সার্চের লুকানো ফাইল ইনপুট — capture থাকায় মোবাইলে সরাসরি ক্যামেরাও খোলা যায় */}
       <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSearchPick} className="hidden" />
+
+      {productsLoadError && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs sm:text-sm px-4 py-2 text-center">
+          পণ্য লোড করতে সাময়িক সমস্যা হচ্ছে। সংযোগ ঠিক হলে তালিকা স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবে।
+        </div>
+      )}
 
       {/* Header */}
       <header className="bg-red-700 text-white sticky top-0 z-40 shadow-md shadow-red-900/10">
@@ -2926,36 +3122,58 @@ export default function App() {
           {cart.length === 0 ? (
             <p className="text-gray-500 text-sm mb-6">আপনার কার্টে কোনো প্রোডাক্ট নেই। আগে একটি প্রোডাক্ট বেছে নিন।</p>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md mb-6 divide-y divide-gray-100">
-              {cart.map((item) => (
-                <div key={item.cartLineId} className="p-4 flex items-center space-x-4">
-                  <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded" />
-                  <div className="flex-1">
-                    <h3 className="font-bold text-gray-800 text-sm">{item.title}</h3>
-                    {(item.selectedSize || item.selectedColor) && (
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {item.selectedSize && `সাইজ: ${item.selectedSize}`}
-                        {item.selectedSize && item.selectedColor && ' · '}
-                        {item.selectedColor && `কালার: ${item.selectedColor}`}
-                      </p>
-                    )}
-                    <p className="text-red-600 font-bold text-sm mt-1">৳ {item.price}</p>
+            <>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6 divide-y divide-gray-100">
+                {cart.map((item) => (
+                  <div key={item.cartLineId} className="p-4 flex items-center gap-4">
+                    <img src={item.image} alt={item.title} className="h-16 w-16 object-cover rounded-xl border border-gray-100" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-800 text-sm truncate">{item.title}</h3>
+                      {(item.selectedSize || item.selectedColor) && (
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {item.selectedSize && `সাইজ: ${item.selectedSize}`}
+                          {item.selectedSize && item.selectedColor && ' · '}
+                          {item.selectedColor && `কালার: ${item.selectedColor}`}
+                        </p>
+                      )}
+                      <p className="text-red-600 font-bold text-sm mt-1">৳ {Number(item.price).toLocaleString('en-BD')}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">আনুমানিক ওজন: {(getEstimatedWeightKg(item) * item.quantity).toFixed(2)} KG</p>
+                    </div>
+                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden shrink-0">
+                      <button onClick={() => handleUpdateQuantity(item.cartLineId, -1)} className="p-2 text-gray-600 hover:bg-gray-100 transition-colors"><Minus className="h-3.5 w-3.5" /></button>
+                      <span className="px-3 text-sm font-semibold tabular-nums">{item.quantity}</span>
+                      <button onClick={() => handleUpdateQuantity(item.cartLineId, 1)} className="p-2 text-gray-600 hover:bg-gray-100 transition-colors"><Plus className="h-3.5 w-3.5" /></button>
+                    </div>
+                    <button onClick={() => handleRemoveFromCart(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1 transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                    <button onClick={() => handleUpdateQuantity(item.cartLineId, -1)} className="p-2 text-gray-600 hover:bg-gray-100 transition-colors"><Minus className="h-3.5 w-3.5" /></button>
-                    <span className="px-3 text-sm font-semibold tabular-nums">{item.quantity}</span>
-                    <button onClick={() => handleUpdateQuantity(item.cartLineId, 1)} className="p-2 text-gray-600 hover:bg-gray-100 transition-colors"><Plus className="h-3.5 w-3.5" /></button>
-                  </div>
-                  <button onClick={() => handleRemoveFromCart(item.cartLineId)} className="text-gray-400 hover:text-red-600 p-1 transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                ))}
+                <div className="p-5 bg-gray-50 space-y-2">
+                  <div className="flex justify-between text-sm"><span className="text-gray-600">পণ্যের মোট</span><span className="font-semibold">৳ {cartTotal.toLocaleString('en-BD')}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-gray-600">আনুমানিক মোট ওজন</span><span className="font-semibold">{estimatedCartWeightKg.toFixed(2)} KG</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-gray-600">আনুমানিক Shipping (৳ {SHIPPING_RATE_PER_KG}/KG)</span><span className="font-semibold">৳ {estimatedShippingCharge.toLocaleString('en-BD')}</span></div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200"><span className="font-bold">আনুমানিক মোট</span><span className="font-display text-red-700 font-bold text-lg">৳ {estimatedGrandTotal.toLocaleString('en-BD')}</span></div>
                 </div>
-              ))}
-              <div className="p-4 flex items-center justify-between bg-gray-50">
-                <span className="font-bold text-gray-700">সর্বমোট</span>
-                <span className="font-display text-red-700 font-bold text-lg">৳ {cartTotal}</span>
               </div>
-            </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                <h3 className="text-lg font-bold mb-1">ডেলিভারি তথ্য</h3>
+                <p className="text-xs text-gray-500 mb-4">চীন থেকে আপনার নির্দিষ্ট লোকেশন পর্যন্ত ডেলিভারি তথ্য দিন।</p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <input value={deliveryDistrict} onChange={(e) => setDeliveryDistrict(e.target.value)} placeholder="জেলা *" className="w-full border rounded-lg p-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
+                  <input value={deliveryArea} onChange={(e) => setDeliveryArea(e.target.value)} placeholder="উপজেলা / থানা" className="w-full border rounded-lg p-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
+                  <input value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} placeholder="মোবাইল নম্বর *" className="w-full border rounded-lg p-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
+                  <div className="sm:col-span-2">
+                    <textarea value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder="সম্পূর্ণ ডেলিভারি ঠিকানা *" rows={3} className="w-full border rounded-lg p-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 resize-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 mb-6 text-xs leading-6">
+                <strong>বিঃদ্রঃ</strong> এখানে দেখানো ওজন ও Shipping Charge আনুমানিক। পণ্য বাংলাদেশে পৌঁছানোর পর প্রকৃত ওজন অনুযায়ী চূড়ান্ত Shipping Charge আপনার অর্ডারে যোগ করা হবে। Shipping Rate: <strong>৳ {SHIPPING_RATE_PER_KG}/kg</strong>। চূড়ান্ত Shipping Charge পরিবর্তিত হলে অর্ডারের মোট পরিমাণও আপডেট হবে।
+              </div>
+            </>
           )}
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
@@ -2975,7 +3193,7 @@ export default function App() {
           </div>
           <button onClick={handleConfirmOrder} disabled={cart.length === 0 || orderSubmitting}
             className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 text-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/25 active:scale-[0.99] disabled:opacity-60 disabled:active:scale-100">
-            {orderSubmitting ? 'সাবমিট হচ্ছে...' : isCustomerLoggedIn ? 'পাইকারি অর্ডার নিশ্চিত করুন' : 'লগ ইন করে অর্ডার নিশ্চিত করুন'}
+            {orderSubmitting ? 'সাবমিট হচ্ছে...' : isCustomerLoggedIn ? 'অর্ডার নিশ্চিত করুন' : 'লগ ইন করে অর্ডার নিশ্চিত করুন'}
           </button>
         </div>
       ) : (
