@@ -25,17 +25,20 @@ import {
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
 
-// প্রোডাক্টের ছবি সিলেক্ট করার সাথে সাথে ব্রাউজারেই compress/resize (max ~300KB, 1000px) করে
+// প্রোডাক্টের ছবি সিলেক্ট করার সাথে সাথে ব্রাউজারেই compress/resize (max ~300KB, 900px) করে
 // Firebase Storage-এ আপলোড করে এবং তার ছোট্ট download URL রিটার্ন করে। এখন থেকে Firestore-এ
 // আর ভারী base64 ছবি সেভ হবে না — এটাই product loading স্লো হওয়ার মূল কারণ ছিল।
+// (fileType আগে webp ছিল — মোবাইল ব্রাউজারে WebP এনকোড অনেক স্লো হয় বলে jpeg-এ পাল্টানো হলো,
+// এতে compress হতে অনেক কম সময় লাগবে, সাইজেও তেমন পার্থক্য পড়ে না।)
 async function compressAndUploadImage(file) {
   const compressedFile = await imageCompression(file, {
     maxSizeMB: 0.3,
-    maxWidthOrHeight: 1000,
+    maxWidthOrHeight: 900,
     useWebWorker: true,
-    fileType: 'image/webp',
+    fileType: 'image/jpeg',
+    initialQuality: 0.75, // শুরুতেই মাঝারি quality থেকে শুরু করলে compression loop-এ কম iteration লাগে, তাই দ্রুত শেষ হয়
   });
-  const path = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.webp`;
+  const path = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
   const fileRef = storageRef(storage, path);
   await uploadBytes(fileRef, compressedFile);
   return getDownloadURL(fileRef);
