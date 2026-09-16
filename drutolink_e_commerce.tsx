@@ -232,6 +232,18 @@ html { scroll-behavior: smooth; }
 }
 `;
 
+// --- কর্মীর উত্তোলন সীমা ---
+// অ্যাডমিন প্রতিটি কর্মীর জন্য আলাদা সীমা সেট করতে পারে (workers/{id}.minWithdrawal)।
+// কিছু সেট না করা থাকলে নিচের ডিফল্ট ব্যবহার হয়। ০ দিলে কোনো সীমা থাকবে না।
+const DEFAULT_MIN_WITHDRAWAL = 500;
+
+/** যেকোনো ইনপুট (খালি স্ট্রিং / null / নাম্বার) থেকে কার্যকর সীমা বের করে। */
+function resolveMinWithdrawal(value) {
+  if (value === '' || value === null || value === undefined) return DEFAULT_MIN_WITHDRAWAL;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_MIN_WITHDRAWAL;
+}
+
 const CATEGORIES = [
   { name: 'ইলেকট্রনিক্স', emoji: '🔌' },
   { name: 'ফ্যাশন ও পোশাক', emoji: '👕' },
@@ -1615,6 +1627,8 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
   const [assignedCategory, setAssignedCategory] = useState(worker.assignedCategory || '');
   const [listingTarget, setListingTarget] = useState(worker.listingTarget ?? '');
   const [ratePerListing, setRatePerListing] = useState(worker.ratePerListing ?? '');
+  // অ্যাডমিন প্রতিটি কর্মীর জন্য আলাদা উত্তোলন সীমা দিতে পারে। খালি রাখলে ডিফল্ট ৫০০।
+  const [minWithdrawal, setMinWithdrawal] = useState(worker.minWithdrawal ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -1622,7 +1636,8 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
     setAssignedCategory(worker.assignedCategory || '');
     setListingTarget(worker.listingTarget ?? '');
     setRatePerListing(worker.ratePerListing ?? '');
-  }, [worker.assignedCategory, worker.listingTarget, worker.ratePerListing]);
+    setMinWithdrawal(worker.minWithdrawal ?? '');
+  }, [worker.assignedCategory, worker.listingTarget, worker.ratePerListing, worker.minWithdrawal]);
 
   const cycleUsed = Number(worker.listingUsed ?? productCount ?? 0);
   const lifetimeListings = Number(worker.lifetimeListings ?? productCount ?? 0);
@@ -1630,13 +1645,14 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
   const currentEarnings = Number(worker.currentEarnings ?? (cycleUsed * (Number(ratePerListing) || 0)));
   const limitReached = listingLimit !== null && cycleUsed >= listingLimit;
   const progress = listingLimit !== null && listingLimit > 0 ? Math.min(100, Math.round((cycleUsed / listingLimit) * 100)) : 0;
+  const effectiveMin = resolveMinWithdrawal(minWithdrawal);
 
   const onSave = async () => {
     setSaving(true);
     setSaved(false);
     try {
       await onSaveSettings(worker.id, {
-        assignedCategory, listingTarget, ratePerListing,
+        assignedCategory, listingTarget, ratePerListing, minWithdrawal,
         currentListingUsed: cycleUsed,
         currentLifetimeListings: lifetimeListings,
       });
@@ -1709,6 +1725,14 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
           <input type="number" min="0" value={ratePerListing} onChange={(e) => setRatePerListing(e.target.value)}
             placeholder="যেমনঃ 5" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
         </div>
+        <div className="col-span-2">
+          <label className="block text-[11px] font-medium text-gray-600 mb-1">উত্তোলনের সর্বনিম্ন সীমা (৳)</label>
+          <input type="number" min="0" value={minWithdrawal} onChange={(e) => setMinWithdrawal(e.target.value)}
+            placeholder={`খালি রাখলে ডিফল্ট ${DEFAULT_MIN_WITHDRAWAL}`} className="w-full border rounded-lg p-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
+          <p className="text-[10px] text-gray-400 mt-1">
+            এই কর্মী কমপক্ষে <span className="font-semibold text-gray-600">৳ {effectiveMin}</span> জমা হলে উত্তোলনের অনুরোধ পাঠাতে পারবে। ০ দিলে যেকোনো পরিমাণেই পারবে।
+          </p>
+        </div>
       </div>
 
       {limitReached && <p className="text-xs font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">এই কর্মীর বর্তমান লিস্টিং লিমিট শেষ। নতুন লিমিট সেট করলে নতুন সাইকেল শুরু হবে।</p>}
@@ -1780,7 +1804,9 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   const pendingAmount = Number(workerProfile?.pendingWithdrawal || 0);
   const availableBalance = Math.max(0, currentEarnings - pendingAmount);
   const hasPendingRequest = pendingAmount > 0 || myWithdrawalRequests.some((r) => r.status === 'pending');
-  const canWithdraw = availableBalance >= 500 && !hasPendingRequest;
+  // অ্যাডমিন এই কর্মীর জন্য যে সীমা দিয়েছে সেটাই মানা হবে; না দিলে ডিফল্ট
+  const minWithdrawal = resolveMinWithdrawal(workerProfile?.minWithdrawal);
+  const canWithdraw = availableBalance > 0 && availableBalance >= minWithdrawal && !hasPendingRequest;
   const limitReached = listingTarget !== null && listingsDone >= listingTarget;
   const targetPct = listingTarget !== null && listingTarget > 0 ? Math.min(100, Math.round((listingsDone / listingTarget) * 100)) : 0;
 
@@ -1910,8 +1936,8 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                   className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-bold py-2 rounded-lg transition-colors">
                   {withdrawing ? 'পাঠানো হচ্ছে...' : hasPendingRequest ? 'অনুরোধ পর্যালোচনাধীন' : 'উত্তোলনের অনুরোধ পাঠান'}
                 </button>
-                {!hasPendingRequest && availableBalance < 500 && (
-                  <p className="text-[10px] text-gray-400 mt-1.5">সর্বনিম্ন ৳৫০০ জমা হলে উত্তোলন করা যাবে।</p>
+                {!hasPendingRequest && availableBalance < minWithdrawal && (
+                  <p className="text-[10px] text-gray-400 mt-1.5">সর্বনিম্ন ৳{minWithdrawal} জমা হলে উত্তোলন করা যাবে।</p>
                 )}
               </div>
             </div>
@@ -2466,7 +2492,7 @@ export default function App() {
   // Admin sets/updates a worker's category, listing limit, and per-listing rate.
   // If the worker has already exhausted the old limit, assigning a new limit starts
   // a fresh cycle. Lifetime listings are never reset.
-  const handleUpdateWorkerSettings = async (workerId, { assignedCategory, listingTarget, ratePerListing, currentListingUsed = 0, currentLifetimeListings = 0 }) => {
+  const handleUpdateWorkerSettings = async (workerId, { assignedCategory, listingTarget, ratePerListing, minWithdrawal = '', currentListingUsed = 0, currentLifetimeListings = 0 }) => {
     const workerRef = doc(db, 'workers', workerId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(workerRef);
@@ -2481,6 +2507,9 @@ export default function App() {
         assignedCategory: assignedCategory || null,
         listingTarget: newLimit,
         ratePerListing: ratePerListing === '' || ratePerListing === null ? null : Math.max(0, Number(ratePerListing)),
+        // খালি রাখলে null → কর্মী ডিফল্ট সীমা পাবে। ০ দিলে কোনো সীমা থাকবে না।
+        minWithdrawal: minWithdrawal === '' || minWithdrawal === null || minWithdrawal === undefined
+          ? null : Math.max(0, Number(minWithdrawal)),
         listingUsed: exhausted && newLimit !== null ? 0 : (current.listingUsed == null ? Number(currentListingUsed || 0) : Number(current.listingUsed)),
         lifetimeListings: current.lifetimeListings == null ? Number(currentLifetimeListings || 0) : Number(current.lifetimeListings),
         currentEarnings: current.currentEarnings == null ? Number(currentListingUsed || 0) * (ratePerListing === '' || ratePerListing === null ? 0 : Math.max(0, Number(ratePerListing))) : Number(current.currentEarnings || 0),
@@ -2493,7 +2522,7 @@ export default function App() {
   // Worker requests to withdraw the current cycle's available balance.
   const handleRequestWithdrawal = async (amount) => {
     const numericAmount = Number(amount || 0);
-    if (numericAmount < 500) throw new Error('সর্বনিম্ন ৳৫০০ উত্তোলন করা যাবে।');
+    if (numericAmount <= 0) throw new Error('উত্তোলনের জন্য কোনো টাকা জমা নেই।');
     if (!authUser?.uid) throw new Error('Worker session not found.');
 
     const workerRef = doc(db, 'workers', authUser.uid);
@@ -2505,7 +2534,10 @@ export default function App() {
       const currentEarnings = Number(worker.currentEarnings || 0);
       const pending = Number(worker.pendingWithdrawal || 0);
       const available = Math.max(0, currentEarnings - pending);
-      if (available < 500) throw new Error('উত্তোলনের জন্য কমপক্ষে ৳৫০০ জমা থাকতে হবে।');
+      // অ্যাডমিনের সেট করা সীমা — ব্রাউজারের হিসাব নয়, ডাটাবেজের মানই চূড়ান্ত
+      const minRequired = resolveMinWithdrawal(worker.minWithdrawal);
+      if (available <= 0) throw new Error('উত্তোলনের জন্য কোনো টাকা জমা নেই।');
+      if (available < minRequired) throw new Error(`উত্তোলনের জন্য কমপক্ষে ৳${minRequired} জমা থাকতে হবে।`);
       if (pending > 0) throw new Error('একটি উত্তোলনের অনুরোধ ইতিমধ্যে অপেক্ষমান আছে।');
 
       transaction.set(withdrawalRef, {
