@@ -22,7 +22,7 @@ import {
   createUserWithEmailAndPassword, updateProfile,
   GoogleAuthProvider, signInWithPopup,
 } from 'firebase/auth';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
 
 // প্রোডাক্টের ছবি সিলেক্ট করার সাথে সাথে ব্রাউজারেই compress/resize (max ~300KB, 900px) করে
@@ -30,17 +30,51 @@ import imageCompression from 'browser-image-compression';
 // আর ভারী base64 ছবি সেভ হবে না — এটাই product loading স্লো হওয়ার মূল কারণ ছিল।
 // (fileType আগে webp ছিল — মোবাইল ব্রাউজারে WebP এনকোড অনেক স্লো হয় বলে jpeg-এ পাল্টানো হলো,
 // এতে compress হতে অনেক কম সময় লাগবে, সাইজেও তেমন পার্থক্য পড়ে না।)
-async function compressAndUploadImage(file) {
-  const compressedFile = await imageCompression(file, {
-    maxSizeMB: 0.3,
-    maxWidthOrHeight: 900,
-    useWebWorker: true,
-    fileType: 'image/jpeg',
-    initialQuality: 0.75, // শুরুতেই মাঝারি quality থেকে শুরু করলে compression loop-এ কম iteration লাগে, তাই দ্রুত শেষ হয়
-  });
+//
+// কম্প্রেস+আপলোড ১-৩ মিনিট লাগার সম্ভাব্য কারণ: ডিফল্ট maxIteration:10 এর কারণে বড় ছবিতে
+// (ফোনের ক্যামেরার ৮-১৫MB ছবি) স্লো ডিভাইসে অনেকবার draw+encode হয়, আর uploadBytes()
+// কোনো progress না দেখানোয় নেট স্লো হলে মনে হয় আটকে গেছে। নিচে দুটোই ঠিক করা হলো:
+// iteration কমিয়ে timeout-fallback বসানো হলো (compress আটকে গেলে আসল ছবিই আপলোড হবে),
+// আর uploadBytesResumable দিয়ে real-time % progress দেখানো হচ্ছে।
+async function compressAndUploadImage(file, onProgress) {
+  let fileToUpload = file;
+
+  if (file.size > 300 * 1024) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // ১২ সেকেন্ডের বেশি কম্প্রেস করতে গেলে থামিয়ে আসল ছবিই আপলোড হবে
+    const t0 = performance.now();
+    try {
+      fileToUpload = await imageCompression(file, {
+        maxSizeMB: 0.3,
+        maxWidthOrHeight: 900,
+        useWebWorker: true,
+        fileType: 'image/jpeg',
+        initialQuality: 0.7,
+        maxIteration: 3, // ডিফল্ট ১০ থেকে কমানো হলো — সাইজ ১০০% নিখুঁত ০.৩MB না হলেও চলবে, কিন্তু iteration কম হওয়ায় অনেক দ্রুত শেষ হবে
+        signal: controller.signal,
+      });
+      console.log(`[image] compress: ${Math.round(file.size / 1024)}KB -> ${Math.round(fileToUpload.size / 1024)}KB in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+    } catch (err) {
+      console.warn('[image] compression skipped (timeout/error) — uploading original file instead:', err);
+      fileToUpload = file;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   const path = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
   const fileRef = storageRef(storage, path);
-  await uploadBytes(fileRef, compressedFile);
+  const task = uploadBytesResumable(fileRef, fileToUpload);
+
+  await new Promise((resolve, reject) => {
+    task.on(
+      'state_changed',
+      (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      reject,
+      resolve
+    );
+  });
+
   return getDownloadURL(fileRef);
 }
 
@@ -1101,6 +1135,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   const [category, setCategory] = useState(CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [editingProductId, setEditingProductId] = useState(null); // null হলে নতুন প্রোডাক্ট যোগ হচ্ছে, id থাকলে ঐ প্রোডাক্ট এডিট হচ্ছে
 
   // --- Size / color variants ---
@@ -1134,8 +1169,9 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     const file = e.target.files[0];
     if (!file) return;
     setUploadingImage(true);
+    setUploadProgress(0);
     try {
-      const url = await compressAndUploadImage(file);
+      const url = await compressAndUploadImage(file, setUploadProgress);
       setImage(url);
     } catch (err) {
       alert(err?.message || 'ছবি আপলোড করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
@@ -1415,7 +1451,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                     {uploadingImage && (
                       <div className="mt-3 flex items-center space-x-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
                         <Loader2 className="h-4 w-4 animate-spin text-yellow-700" />
-                        <p className="text-xs font-bold text-yellow-700">ছবি কম্প্রেস ও আপলোড হচ্ছে...</p>
+                        <p className="text-xs font-bold text-yellow-700">ছবি কম্প্রেস ও আপলোড হচ্ছে... {uploadProgress}%</p>
                       </div>
                     )}
                     {!uploadingImage && image && (
@@ -1771,6 +1807,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   const [category, setCategory] = useState(workerProfile?.assignedCategory || CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [withdrawing, setWithdrawing] = useState(false);
   const [sizeInput, setSizeInput] = useState('');
   const [sizes, setSizes] = useState([]);
@@ -1800,8 +1837,9 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     const file = e.target.files[0];
     if (!file) return;
     setUploadingImage(true);
+    setUploadProgress(0);
     try {
-      const url = await compressAndUploadImage(file);
+      const url = await compressAndUploadImage(file, setUploadProgress);
       setImage(url);
     } catch (err) {
       alert(err?.message || 'ছবি আপলোড করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
@@ -2009,7 +2047,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                   {uploadingImage && (
                     <div className="mt-3 flex items-center space-x-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
                       <Loader2 className="h-4 w-4 animate-spin text-yellow-700" />
-                      <p className="text-xs font-bold text-yellow-700">ছবি কম্প্রেস ও আপলোড হচ্ছে...</p>
+                      <p className="text-xs font-bold text-yellow-700">ছবি কম্প্রেস ও আপলোড হচ্ছে... {uploadProgress}%</p>
                     </div>
                   )}
                   {!uploadingImage && image && (
