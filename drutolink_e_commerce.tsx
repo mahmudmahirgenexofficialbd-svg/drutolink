@@ -11,7 +11,7 @@ import {
   Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
   Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award
 } from 'lucide-react';
-import { db, auth, secondaryAuth } from './firebase';
+import { db, auth, secondaryAuth, storage } from './firebase';
 import { useVisualSearch } from './visualSearch';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where,
@@ -22,6 +22,24 @@ import {
   createUserWithEmailAndPassword, updateProfile,
   GoogleAuthProvider, signInWithPopup,
 } from 'firebase/auth';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
+
+// প্রোডাক্টের ছবি সিলেক্ট করার সাথে সাথে ব্রাউজারেই compress/resize (max ~300KB, 1000px) করে
+// Firebase Storage-এ আপলোড করে এবং তার ছোট্ট download URL রিটার্ন করে। এখন থেকে Firestore-এ
+// আর ভারী base64 ছবি সেভ হবে না — এটাই product loading স্লো হওয়ার মূল কারণ ছিল।
+async function compressAndUploadImage(file) {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.3,
+    maxWidthOrHeight: 1000,
+    useWebWorker: true,
+    fileType: 'image/webp',
+  });
+  const path = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.webp`;
+  const fileRef = storageRef(storage, path);
+  await uploadBytes(fileRef, compressedFile);
+  return getDownloadURL(fileRef);
+}
 
 // এই ইমেইলটা Firebase Console → Authentication → Users এ যে অ্যাডমিন ইউজার বানাবেন, সেটার সাথে হুবহু মিলতে হবে
 const ADMIN_EMAIL = 'admin@drutolink.com';
@@ -1079,6 +1097,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null); // null হলে নতুন প্রোডাক্ট যোগ হচ্ছে, id থাকলে ঐ প্রোডাক্ট এডিট হচ্ছে
 
   // --- Size / color variants ---
@@ -1108,12 +1127,17 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
 
   const handleRemoveColor = (name) => setColors((prev) => prev.filter((c) => c.name !== name));
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result);
-      reader.readAsDataURL(file);
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const url = await compressAndUploadImage(file);
+      setImage(url);
+    } catch (err) {
+      alert(err?.message || 'ছবি আপলোড করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -1121,6 +1145,10 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     e.preventDefault();
     if (!title || !price) {
       alert('প্রোডাক্টের নাম ও দাম দিন।');
+      return;
+    }
+    if (uploadingImage) {
+      alert('ছবি এখনো আপলোড হচ্ছে, একটু অপেক্ষা করুন।');
       return;
     }
     setSaving(true);
@@ -1378,10 +1406,16 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
                     <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                      <input type="file" accept="image/*" onChange={handleImageUpload}
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer" />
+                      <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage}
+                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer disabled:opacity-50" />
                     </div>
-                    {image && (
+                    {uploadingImage && (
+                      <div className="mt-3 flex items-center space-x-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                        <Loader2 className="h-4 w-4 animate-spin text-yellow-700" />
+                        <p className="text-xs font-bold text-yellow-700">ছবি কম্প্রেস ও আপলোড হচ্ছে...</p>
+                      </div>
+                    )}
+                    {!uploadingImage && image && (
                       <div className="mt-3 flex items-center space-x-3 bg-red-50 p-3 rounded-lg border border-red-100">
                         <img src={image} alt="Preview" className="h-16 w-16 object-cover rounded border" />
                         <div>
@@ -1733,6 +1767,7 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(workerProfile?.assignedCategory || CATEGORIES[0].name);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [sizeInput, setSizeInput] = useState('');
   const [sizes, setSizes] = useState([]);
@@ -1758,12 +1793,17 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   };
   const handleRemoveColor = (name) => setColors((prev) => prev.filter((c) => c.name !== name));
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result);
-      reader.readAsDataURL(file);
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const url = await compressAndUploadImage(file);
+      setImage(url);
+    } catch (err) {
+      alert(err?.message || 'ছবি আপলোড করতে সমস্যা হয়েছে, আবার চেষ্টা করুন।');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -1801,6 +1841,10 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
     e.preventDefault();
     if (!title || !price) {
       alert('প্রোডাক্টের নাম ও দাম দিন।');
+      return;
+    }
+    if (uploadingImage) {
+      alert('ছবি এখনো আপলোড হচ্ছে, একটু অপেক্ষা করুন।');
       return;
     }
     setSaving(true);
@@ -1956,10 +2000,16 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
                   <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                    <input type="file" accept="image/*" onChange={handleImageUpload}
-                      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer" />
+                    <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage}
+                      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer disabled:opacity-50" />
                   </div>
-                  {image && (
+                  {uploadingImage && (
+                    <div className="mt-3 flex items-center space-x-2 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                      <Loader2 className="h-4 w-4 animate-spin text-yellow-700" />
+                      <p className="text-xs font-bold text-yellow-700">ছবি কম্প্রেস ও আপলোড হচ্ছে...</p>
+                    </div>
+                  )}
+                  {!uploadingImage && image && (
                     <div className="mt-3 flex items-center space-x-3 bg-red-50 p-3 rounded-lg border border-red-100">
                       <img src={image} alt="Preview" className="h-16 w-16 object-cover rounded border" />
                       <div>
