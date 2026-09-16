@@ -1037,7 +1037,7 @@ function OverviewTab({ products, orders, workers, withdrawalRequests }) {
   );
 }
 
-function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal, handleUpdateOrderShipping }) {
+function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
 
@@ -2681,7 +2681,6 @@ export default function App() {
         handleUpdateWorkerSettings={handleUpdateWorkerSettings}
         withdrawalRequests={withdrawalRequests}
         handleProcessWithdrawal={handleProcessWithdrawal}
-        handleUpdateOrderShipping={handleUpdateOrderShipping}
       />
     );
   }
