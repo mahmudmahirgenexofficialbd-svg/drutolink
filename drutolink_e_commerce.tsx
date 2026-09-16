@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import logoAsset from './src/assets/drutolink-logo.png';
-import slide1Asset from './src/assets/slide1.jpg';
-import slide2Asset from './src/assets/slide2.jpg';
-import slide3Asset from './src/assets/slide3.jpg';
-import productPlaceholderAsset from './src/assets/product-placeholder.svg';
+import logoAsset from './logo.png';
+import slide1Asset from './slide1.jpg';
+import slide2Asset from './slide2.jpg';
+import slide3Asset from './slide3.jpg';
+const productPlaceholderAsset = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'>No Image</text></svg>";
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
@@ -1131,7 +1131,6 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
         estimatedWeightKg: Number(estimatedWeightKg) > 0 ? Number(estimatedWeightKg) : null,
         category,
         image: image || 'productPlaceholderAsset',
-        estimatedWeightKg: Number(estimatedWeightKg) > 0 ? Number(estimatedWeightKg) : null,
         sizes,
         colors,
       };
