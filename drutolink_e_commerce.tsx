@@ -3,6 +3,7 @@ import logoAsset from './logo.png';
 import slide1Asset from './slide1.jpg';
 import slide2Asset from './slide2.jpg';
 import slide3Asset from './slide3.jpg';
+import promoPopupAsset from './promo-popup.jpg';
 const productPlaceholderAsset = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'>No Image</text></svg>";
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
@@ -2137,6 +2138,21 @@ export default function App() {
   const [staffMenuOpen, setStaffMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false); // মোবাইলে হেডারের ৩-বার আইকনে ক্লিক করলে এই ড্রয়ার খোলে
 
+  // সাইটে ঢোকার সাথে সাথেই প্রোমো পপ-আপ দেখায় (শুধু হোম পেজে)। একবার বন্ধ করলে
+  // sessionStorage-এ মনে রাখে, তাই একই ব্রাউজার ট্যাবে বারবার এসে আর দেখাবে না —
+  // ট্যাব বন্ধ করে নতুন করে সাইটে ঢুকলে আবার দেখাবে।
+  const [showPromoPopup, setShowPromoPopup] = useState(() => {
+    try {
+      return sessionStorage.getItem('dl_promo_popup_seen') !== '1';
+    } catch {
+      return true;
+    }
+  });
+  const closePromoPopup = () => {
+    setShowPromoPopup(false);
+    try { sessionStorage.setItem('dl_promo_popup_seen', '1'); } catch {}
+  };
+
   const productsRef = useRef(null);
   const howItWorksRef = useRef(null);
 
@@ -3017,6 +3033,38 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white font-body text-gray-900">
       <style>{FONTS}</style>
+
+      {/* এন্ট্রি পপ-আপ — সাইটে ঢোকার সাথে সাথেই দেখায় */}
+      {showPromoPopup && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
+          onClick={closePromoPopup}
+        >
+          <div
+            className="relative max-w-sm w-full bg-white rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closePromoPopup}
+              aria-label="বন্ধ করুন"
+              className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 z-10 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="overflow-y-auto">
+              <img src={promoPopupAsset} alt="চায়না থেকে বাংলাদেশ প্রোডাক্ট, এখন আপনার ঠিকানায়" className="w-full h-auto block" />
+            </div>
+            <div className="p-4 shrink-0">
+              <button
+                onClick={() => { closePromoPopup(); scrollToProducts(); }}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98]"
+              >
+                এখনই অর্ডার করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ছবি সার্চের লুকানো ফাইল ইনপুট — capture থাকায় মোবাইলে সরাসরি ক্যামেরাও খোলা যায় */}
       <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSearchPick} className="hidden" />
