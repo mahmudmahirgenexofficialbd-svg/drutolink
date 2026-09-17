@@ -14,7 +14,7 @@ import {
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
 import {
-  collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where,
+  collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, limit,
   serverTimestamp, updateDoc, setDoc, getDoc, runTransaction,
 } from 'firebase/firestore';
 import {
@@ -2155,6 +2155,9 @@ export default function App() {
   const [orders, setOrders] = useState([]);
 
   // Real-time product feed from Firestore — visible to every visitor, not just this browser
+  // (এটা admin/worker ড্যাশবোর্ড, অর্ডার হিস্টোরির প্রোডাক্ট লুকআপ, আর ছবি-সার্চের ইনডেক্সের
+  // জন্য পুরো ক্যাটালগ রাখে — নিচের storefrontProducts স্টোরফ্রন্ট গ্রিডের জন্য আলাদা,
+  // পেজিনেটেড ফিড।)
   useEffect(() => {
     const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -2165,6 +2168,52 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  // --- Storefront pagination (হোম + ক্যাটাগরি পেজ ফাস্ট রাখতে) ---
+  // প্রথমে ২০টা প্রোডাক্ট আনা হয়, "আরও দেখুন" চাপলে আরও ২০টা করে যোগ হয়।
+  // ক্যাটাগরি বাছাই করলে Firestore কোয়েরি লেভেলেই ওই ক্যাটাগরির প্রোডাক্ট আনা হয়,
+  // তাই ক্যাটাগরি পেজও পুরো ক্যাটালগ না টেনে ফাস্ট থাকে।
+  const STOREFRONT_PAGE_SIZE = 20;
+  const [storefrontLimit, setStorefrontLimit] = useState(STOREFRONT_PAGE_SIZE);
+  const [storefrontProducts, setStorefrontProducts] = useState([]);
+  const [storefrontLoading, setStorefrontLoading] = useState(true);
+  const [storefrontHasMore, setStorefrontHasMore] = useState(true);
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
+
+  useEffect(() => {
+    setStorefrontLoading(true);
+    const storefrontQuery = selectedCategory
+      ? query(
+          collection(db, 'products'),
+          where('category', '==', selectedCategory),
+          orderBy('createdAt', 'desc'),
+          limit(storefrontLimit)
+        )
+      : query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(storefrontLimit));
+
+    const unsub = onSnapshot(storefrontQuery, (snapshot) => {
+      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setStorefrontProducts(docs);
+      // limit()-এর সমান বা বেশি ডকুমেন্ট এলে ধরে নিচ্ছি আরও থাকতে পারে
+      setStorefrontHasMore(docs.length >= storefrontLimit);
+      setStorefrontLoading(false);
+      setLoadingMoreProducts(false);
+    }, () => {
+      setStorefrontLoading(false);
+      setLoadingMoreProducts(false);
+    });
+    return () => unsub();
+  }, [selectedCategory, storefrontLimit]);
+
+  // "আরও দেখুন"-এ ক্লিক করলে লিমিট আরও ২০ বাড়িয়ে দেয়
+  const handleShowMoreProducts = () => {
+    setLoadingMoreProducts(true);
+    setStorefrontLimit((n) => n + STOREFRONT_PAGE_SIZE);
+  };
+
+  // ক্যাটাগরি বদলানোর সময় এটা কল করলে লিমিট ২০-তে রিসেট হয়ে যায়, নাহলে আগের
+  // ক্যাটাগরিতে "আরও দেখুন" চেপে বাড়ানো লিমিট নতুন ক্যাটাগরিতেও থেকে যেত
+  const resetStorefrontPaging = () => setStorefrontLimit(STOREFRONT_PAGE_SIZE);
 
   // ছবি দিয়ে প্রোডাক্ট খোঁজা — পুরোটাই ব্রাউজারে চলে, কোনো API লাগে না (visualSearch.ts দেখুন)
   const visual = useVisualSearch(products);
@@ -2691,9 +2740,7 @@ export default function App() {
           return p ? { ...p, _matchScore: m.score } : null;
         })
         .filter(Boolean)
-    : products
-        .filter((p) => !selectedCategory || p.category === selectedCategory)
-        .filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+    : storefrontProducts.filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (!authChecked && currentView === 'admin') {
     return <div className="min-h-screen flex items-center justify-center text-gray-500 font-body">লোড হচ্ছে...</div>;
@@ -3084,14 +3131,14 @@ export default function App() {
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">ক্যাটাগরি</p>
           <div className="space-y-1 mb-5">
             <button
-              onClick={() => { setSelectedCategory(null); setMobileNavOpen(false); scrollToProducts(); }}
+              onClick={() => { setSelectedCategory(null); resetStorefrontPaging(); setMobileNavOpen(false); scrollToProducts(); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${!selectedCategory ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
               <span className="text-lg">🛍️</span> সব প্রোডাক্ট
             </button>
             {CATEGORIES.map((c) => (
               <button
                 key={c.name}
-                onClick={() => { setSelectedCategory(c.name); setMobileNavOpen(false); scrollToProducts(); }}
+                onClick={() => { setSelectedCategory(c.name); resetStorefrontPaging(); setMobileNavOpen(false); scrollToProducts(); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategory === c.name ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
                 <span className="text-lg">{c.emoji}</span> {c.name}
               </button>
@@ -3324,14 +3371,14 @@ export default function App() {
             <div className="flex items-center justify-between mb-4">
               <div><p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">Explore</p><h2 className="font-display text-2xl font-extrabold text-gray-900">ক্যাটাগরি থেকে পণ্য খুঁজুন</h2></div>
               {selectedCategory && (
-                <button onClick={() => setSelectedCategory(null)} className="text-xs text-red-600 hover:underline transition-colors">সব দেখুন ✕</button>
+                <button onClick={() => { setSelectedCategory(null); resetStorefrontPaging(); }} className="text-xs text-red-600 hover:underline transition-colors">সব দেখুন ✕</button>
               )}
             </div>
             <div className="overflow-hidden pb-2">
               <div className="flex gap-3 w-max cat-marquee-track">
                 {/* তালিকাটা দুইবার বসানো হয়েছে যাতে -50% পর্যন্ত সরলে লুপটা নিরবচ্ছিন্ন (seamless) দেখায় */}
                 {[...CATEGORIES, ...CATEGORIES].map((c, i) => (
-                  <button key={`${c.name}-${i}`} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); scrollToProducts(); }}
+                  <button key={`${c.name}-${i}`} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); resetStorefrontPaging(); scrollToProducts(); }}
                     className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selectedCategory === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
                     <span className="text-2xl">{c.emoji}</span>
                     <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
@@ -3401,7 +3448,9 @@ export default function App() {
                   <button onClick={visual.clear} className="mt-3 text-red-700 font-semibold underline underline-offset-2">সব পণ্য দেখুন</button>
                 </div>
               ) : (
-                <p className="text-gray-500 text-sm">কোনো প্রোডাক্ট পাওয়া যায়নি। {products.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</p>
+                <p className="text-gray-500 text-sm">
+                  {storefrontLoading ? 'লোড হচ্ছে...' : <>কোনো প্রোডাক্ট পাওয়া যায়নি। {storefrontProducts.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</>}
+                </p>
               )
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
@@ -3440,6 +3489,21 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* "আরও দেখুন" — ছবি-সার্চ চালু না থাকলে ও লেখা-সার্চ খালি থাকলেই কেবল দেখাই,
+                কারণ ছবি-সার্চ/টেক্সট-সার্চ ফলাফল একবারেই সব দেখানো হয় */}
+            {!visual.active && !searchQuery && storefrontHasMore && (
+              <div className="flex justify-center mt-8">
+                <button
+                  onClick={handleShowMoreProducts}
+                  disabled={loadingMoreProducts}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-red-300 text-red-600 font-semibold hover:bg-red-50 transition-colors disabled:opacity-60"
+                >
+                  {loadingMoreProducts && <Loader2 className="h-4 w-4 animate-spin" />}
+                  আরও দেখুন
+                </button>
               </div>
             )}
           </section>
