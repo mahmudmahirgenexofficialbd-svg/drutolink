@@ -2154,11 +2154,18 @@ export default function App() {
   const [productsLoadError, setProductsLoadError] = useState(false);
   const [orders, setOrders] = useState([]);
 
-  // Real-time product feed from Firestore — visible to every visitor, not just this browser
-  // (এটা admin/worker ড্যাশবোর্ড, অর্ডার হিস্টোরির প্রোডাক্ট লুকআপ, আর ছবি-সার্চের ইনডেক্সের
-  // জন্য পুরো ক্যাটালগ রাখে — নিচের storefrontProducts স্টোরফ্রন্ট গ্রিডের জন্য আলাদা,
-  // পেজিনেটেড ফিড।)
+  // পুরো ক্যাটালগ (সব প্রোডাক্ট, কোনো limit ছাড়া) শুধু admin/worker ড্যাশবোর্ড আর
+  // ছবি-সার্চের জন্য দরকার। এটা আগে সব ভিজিটরের জন্য সাথে সাথেই লোড হতো —
+  // তাতে বড় (base64 ছবিসহ) পুরো ক্যাটালগ একটা সিঙ্গেল Firestore স্ট্রিমে ডাউনলোড
+  // হওয়া শুরু করত এবং একই স্ট্রিমে থাকা storefront-এর হালকা, ২০টার কোয়েরিটাও
+  // তার পেছনে আটকে থেকে দেরিতে আসত — এই কারণেই প্রথমবার সাইট খোলার সাথে সাথে
+  // প্রোডাক্ট দেখা যাচ্ছিল না, "আরও দেখুন"-এ ক্লিক করার পর (যা নতুন করে কানেকশন
+  // ট্রিগার করত) হঠাৎ দেখা যেত। তাই এখন এই ভারী লিস্টেনারটা তখনই চালু হয় যখন
+  // সত্যিই দরকার (অ্যাডমিন/ওয়ার্কার প্যানেল খোলা হলে, বা ছবি-সার্চ ব্যবহার করা হলে)।
+  const [catalogNeeded, setCatalogNeeded] = useState(false);
+
   useEffect(() => {
+    if (!catalogNeeded) return;
     const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setProductsLoadError(false);
@@ -2167,7 +2174,7 @@ export default function App() {
       setProductsLoadError(true);
     });
     return () => unsub();
-  }, []);
+  }, [catalogNeeded]);
 
   // --- Storefront pagination (হোম + ক্যাটাগরি পেজ ফাস্ট রাখতে) ---
   // প্রথমে ২০টা প্রোডাক্ট আনা হয়, "আরও দেখুন" চাপলে আরও ২০টা করে যোগ হয়।
@@ -2218,7 +2225,7 @@ export default function App() {
   // ছবি দিয়ে প্রোডাক্ট খোঁজা — পুরোটাই ব্রাউজারে চলে, কোনো API লাগে না (visualSearch.ts দেখুন)
   const visual = useVisualSearch(products);
   const imageInputRef = useRef(null);
-  const openImageSearch = () => imageInputRef.current?.click();
+  const openImageSearch = () => { setCatalogNeeded(true); imageInputRef.current?.click(); };
   const handleImageSearchPick = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -2245,6 +2252,15 @@ export default function App() {
   // collection (created by the admin from the Workers tab).
   const isWorkerLoggedIn = !!authUser && authUser.email !== ADMIN_EMAIL && !!workerProfile;
   const isCustomerLoggedIn = !!authUser && authUser.email !== ADMIN_EMAIL && !isWorkerLoggedIn;
+
+  // অ্যাডমিন/ওয়ার্কার প্যানেল খোলা হলে (লগইন স্ক্রিনে গেলেই, লগইন সফল হওয়ার
+  // অপেক্ষা না করেই) পুরো ক্যাটালগ লোড শুরু হয়ে যায়, যাতে লগইন করার সাথে সাথেই
+  // ড্যাশবোর্ডে ডেটা রেডি থাকে।
+  useEffect(() => {
+    if (currentView === 'admin' || currentView === 'worker' || isAdminLoggedIn || isWorkerLoggedIn) {
+      setCatalogNeeded(true);
+    }
+  }, [currentView, isAdminLoggedIn, isWorkerLoggedIn]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
