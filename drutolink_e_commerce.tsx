@@ -10,7 +10,8 @@ import {
   Menu, ShoppingCart, User, CreditCard, LayoutDashboard, ShoppingBag,
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
   Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
-  Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award
+  Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award,
+  Copy, Check
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
@@ -52,6 +53,14 @@ function useInView(threshold = 0.25) {
 }
 
 const SHIPPING_RATE_PER_KG = 900;
+
+// ম্যানুয়াল bKash / Nagad পেমেন্ট নম্বর — গ্রাহক এই নম্বরে "Send Money" করে
+// নিজের নম্বর ও TrxID দেবে, অ্যাডমিন প্যানেল থেকে ম্যানুয়ালি যাচাই করা হবে।
+// নম্বর পরিবর্তন করতে চাইলে শুধু নিচের মানগুলো বদলান।
+const PAYMENT_NUMBERS = {
+  bkash: '01620177883',
+  nagad: '01620177883',
+};
 
 // Product-level weight is preferred. For legacy products that don't have a weight yet,
 // use a conservative category-based estimate so the cart can still show an approximate
@@ -1317,11 +1326,11 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                           <p className="text-xs text-red-600 font-bold mt-1">মোট ৳ {Number(o.totalPrice || 0).toLocaleString('en-BD')}</p>
                         </td>
                         <td className="p-4">
-                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold mb-1 ${o.paymentProvider === 'UddoktaPay' ? 'bg-red-100 text-red-700' : o.paymentMethod === 'bkash' ? 'bg-pink-100 text-pink-700' : 'bg-orange-100 text-orange-700'}`}>
-                            {o.paymentProvider === 'UddoktaPay' ? 'UddoktaPay' : o.paymentMethod === 'bkash' ? 'bKash' : 'Nagad'}
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold mb-1 ${o.paymentMethod === 'bkash' ? 'bg-pink-100 text-pink-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {o.paymentMethod === 'bkash' ? 'bKash' : 'Nagad'}
                           </span>
-                          <p className="font-mono text-sm">{o.transactionId || o.trxId || '—'}</p>
-                          <p className="text-[11px] text-gray-500">{o.invoiceId ? `Invoice: ${o.invoiceId}` : o.accountNumber ? `A/C: ${o.accountNumber}` : 'Automated payment'}</p>
+                          <p className="font-mono text-sm">TrxID: {o.trxId || o.transactionId || '—'}</p>
+                          <p className="text-[11px] text-gray-500">{o.accountNumber ? `Sender: ${o.accountNumber}` : 'নম্বর দেওয়া হয়নি'}</p>
                           {o.paymentStatus && <p className="text-[11px] font-semibold mt-1">Status: {o.paymentStatus}</p>}
                         </td>
                         <td className="p-4 min-w-[230px]">
@@ -2116,129 +2125,32 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
   );
 }
 
-// --- UDDOKTAPAY PAYMENT RESULT ---
-function PaymentResult({ mode, invoiceId, onBackHome }) {
-  const [state, setState] = useState('loading');
-  const [message, setMessage] = useState('পেমেন্ট যাচাই করা হচ্ছে...');
-  const [details, setDetails] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const verify = async () => {
-      if (mode === 'cancelled') {
-        setState('cancelled');
-        setMessage('পেমেন্ট বাতিল করা হয়েছে। আপনার অর্ডারটি এখনো Payment Pending অবস্থায় আছে।');
-        return;
-      }
-      if (!invoiceId) {
-        setState('error');
-        setMessage('invoice_id পাওয়া যায়নি। পেমেন্ট যাচাই করা সম্ভব হয়নি।');
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/uddoktapay/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ invoice_id: invoiceId }),
-        });
-        const responseText = await response.text();
-        let data = {};
-        try {
-          data = responseText ? JSON.parse(responseText) : {};
-        } catch {
-          throw new Error(`সার্ভার থেকে সঠিক JSON response পাওয়া যায়নি (HTTP ${response.status})।`);
-        }
-        if (!response.ok || data?.status === false) {
-          throw new Error(data?.message || 'পেমেন্ট যাচাই ব্যর্থ হয়েছে।');
-        }
-        if (cancelled) return;
-
-        const orderId = String(data?.metadata?.order_id || '').trim();
-        if (!orderId) throw new Error('পেমেন্ট রেসপন্সে order_id পাওয়া যায়নি।');
-
-        const orderSnap = await getDoc(doc(db, 'orders', orderId));
-        if (!orderSnap.exists()) throw new Error('সংশ্লিষ্ট অর্ডার পাওয়া যায়নি।');
-        const order = orderSnap.data();
-        const paidAmount = Number(data?.amount);
-        const expectedAmount = Number(order?.totalPrice);
-        if (!Number.isFinite(paidAmount) || !Number.isFinite(expectedAmount) || Math.abs(paidAmount - expectedAmount) > 0.01) {
-          throw new Error('পেমেন্টের পরিমাণ অর্ডারের মোট পরিমাণের সাথে মেলেনি। অর্ডারটি স্বয়ংক্রিয়ভাবে Confirm করা হয়নি।');
-        }
-
-        if (data.status === 'COMPLETED') {
-          await updateDoc(doc(db, 'orders', orderId), {
-            status: 'Order Placed',
-            paymentStatus: 'PAID',
-            paymentProvider: 'UddoktaPay',
-            invoiceId: data.invoice_id || invoiceId,
-            transactionId: data.transaction_id || null,
-            paymentMethod: data.payment_method || null,
-            senderNumber: data.sender_number || null,
-            paymentAmount: paidAmount,
-            paymentFee: Number(data.fee || 0),
-            paymentChargedAmount: Number(data.charged_amount || paidAmount),
-            paidAt: serverTimestamp(),
-          });
-          setDetails({ ...data, orderId });
-          setState('success');
-          setMessage('পেমেন্ট সফল হয়েছে এবং আপনার অর্ডার Confirm করা হয়েছে।');
-        } else if (data.status === 'PENDING') {
-          await updateDoc(doc(db, 'orders', orderId), {
-            status: 'Payment Pending',
-            paymentStatus: 'PENDING',
-            paymentProvider: 'UddoktaPay',
-            invoiceId: data.invoice_id || invoiceId,
-          });
-          setDetails({ ...data, orderId });
-          setState('pending');
-          setMessage('পেমেন্ট এখনো Pending। কিছুক্ষণ পরে Order Tracking থেকে স্ট্যাটাস দেখুন।');
-        } else {
-          await updateDoc(doc(db, 'orders', orderId), {
-            paymentStatus: 'ERROR',
-            paymentProvider: 'UddoktaPay',
-            invoiceId: data.invoice_id || invoiceId,
-          });
-          setState('error');
-          setMessage(data?.message || 'পেমেন্ট সম্পন্ন হয়নি।');
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setState('error');
-          setMessage(error?.message || 'পেমেন্ট যাচাই করতে সমস্যা হয়েছে।');
-        }
-      }
-    };
-    verify();
-    return () => { cancelled = true; };
-  }, [mode, invoiceId]);
-
-  const toneClass = state === 'success'
-    ? 'bg-green-50 text-green-600'
-    : state === 'pending' || state === 'cancelled'
-      ? 'bg-amber-50 text-amber-600'
-      : 'bg-red-50 text-red-600';
+// --- COPYABLE PAYMENT NUMBER (bKash/Nagad Send Money নম্বর কপি করার বাটনসহ) ---
+function CopyableNumber({ number }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(number);
+    } catch {
+      // clipboard API না থাকলে ফলব্যাক
+      const el = document.createElement('textarea');
+      el.value = number;
+      document.body.appendChild(el);
+      el.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 font-body">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-lg w-full text-center">
-        <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-5 ${toneClass}`}>
-          {state === 'loading' ? <Loader2 className="h-8 w-8 animate-spin" /> : state === 'success' ? <CheckCircle className="h-8 w-8" /> : <AlertTriangle className="h-8 w-8" />}
-        </div>
-        <h1 className="text-2xl font-extrabold text-gray-900 mb-3">
-          {state === 'success' ? 'পেমেন্ট সফল' : state === 'pending' ? 'পেমেন্ট Pending' : state === 'cancelled' ? 'পেমেন্ট বাতিল' : state === 'loading' ? 'পেমেন্ট যাচাই হচ্ছে' : 'পেমেন্ট যাচাই ব্যর্থ'}
-        </h1>
-        <p className="text-sm leading-6 text-gray-600">{message}</p>
-        {details && (
-          <div className="mt-5 bg-gray-50 rounded-xl p-4 text-left text-sm space-y-2">
-            <div className="flex justify-between gap-4"><span className="text-gray-500">Order ID</span><b>{details.orderId}</b></div>
-            <div className="flex justify-between gap-4"><span className="text-gray-500">Invoice ID</span><b className="font-mono text-xs">{details.invoice_id}</b></div>
-            {details.transaction_id && <div className="flex justify-between gap-4"><span className="text-gray-500">Transaction ID</span><b className="font-mono text-xs">{details.transaction_id}</b></div>}
-            <div className="flex justify-between gap-4"><span className="text-gray-500">Amount</span><b>৳ {Number(details.amount || 0).toLocaleString('en-BD')}</b></div>
-          </div>
-        )}
-        <button onClick={onBackHome} className="mt-6 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl">স্টোরে ফিরে যান</button>
-      </div>
-    </div>
+    <span className="inline-flex items-center gap-2">
+      <span className="font-mono font-bold text-lg tracking-wide">{number}</span>
+      <button type="button" onClick={handleCopy}
+        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition-colors">
+        {copied ? <><Check className="h-3.5 w-3.5 text-green-600" /> কপি হয়েছে</> : <><Copy className="h-3.5 w-3.5" /> কপি</>}
+      </button>
+    </span>
   );
 }
 
@@ -2248,8 +2160,6 @@ export default function App() {
   // সরাসরি URL হ্যাশ (#worker, #admin) দিয়ে ঢোকা যাবে — স্ক্রল করার দরকার নেই।
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('payment') === 'success' || params.get('payment') === 'cancelled') return 'payment-result';
       const h = window.location.hash.replace('#', '');
       return (h === 'admin' || h === 'worker') ? h : 'home';
     }
@@ -2851,10 +2761,18 @@ export default function App() {
       return;
     }
 
+    if (!accountNumber.trim()) {
+      alert(`যে ${paymentMethod === 'bkash' ? 'bKash' : 'Nagad'} নম্বর থেকে Send Money করেছেন, সেই নম্বরটি দিন।`);
+      return;
+    }
+    if (!trxId.trim()) {
+      alert('অনুগ্রহ করে Transaction ID (TrxID) দিন।');
+      return;
+    }
+
     setOrderSubmitting(true);
-    let orderRef = null;
     try {
-      orderRef = doc(collection(db, 'orders'));
+      const orderRef = doc(collection(db, 'orders'));
       const orderNumber = `DL-${orderRef.id.slice(0, 8).toUpperCase()}`;
       await setDoc(orderRef, {
         items: cart.map((item) => ({
@@ -2874,18 +2792,19 @@ export default function App() {
         finalShippingCharge: null,
         actualWeightKg: null,
         totalPrice: estimatedGrandTotal,
-        paymentMethod: 'uddoktapay',
-        paymentProvider: 'UddoktaPay',
+        paymentMethod, // 'bkash' | 'nagad'
+        paymentProvider: 'Manual',
         paymentStatus: 'PENDING',
-        accountNumber: null,
-        trxId: null,
+        receivingNumber: PAYMENT_NUMBERS[paymentMethod],
+        accountNumber: accountNumber.trim(),
+        trxId: trxId.trim(),
         deliveryAddress: {
           district: deliveryDistrict,
           area: deliveryArea || null,
           address: deliveryAddress,
           phone: deliveryPhone
         },
-        status: 'Payment Pending',
+        status: 'Pending TrxID',
         createdAt: serverTimestamp(),
         customerId: authUser.uid,
         customerName: customerProfile?.name || authUser.displayName || '',
@@ -2893,44 +2812,17 @@ export default function App() {
         customerPhone: customerProfile?.phone || null,
       });
 
-      const response = await fetch('/api/uddoktapay/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          order_id: orderRef.id,
-          full_name: customerProfile?.name || authUser.displayName || authUser.email || 'DrutoLink Customer',
-          email: authUser.email || '',
-          amount: estimatedGrandTotal,
-          origin: window.location.origin,
-        }),
-      });
-      const responseText = await response.text();
-      let data = {};
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch {
-        throw new Error(`সার্ভার থেকে সঠিক JSON response পাওয়া যায়নি (HTTP ${response.status})।`);
-      }
-      if (!response.ok || data?.status === false || !data?.payment_url) {
-        throw new Error(data?.message || 'UddoktaPay payment link তৈরি করা যায়নি।');
-      }
-
-      await updateDoc(orderRef, {
-        paymentInitiated: true,
-        paymentInitiatedAt: serverTimestamp(),
-      });
-
-      window.location.assign(data.payment_url);
+      alert('অর্ডার সফলভাবে জমা হয়েছে! আপনার TrxID যাচাই করে শীঘ্রই অর্ডার কনফার্ম করা হবে।');
+      setCart([]);
+      setAccountNumber('');
+      setTrxId('');
+      setDeliveryDistrict('');
+      setDeliveryArea('');
+      setDeliveryAddress('');
+      setDeliveryPhone('');
+      goToOrders();
     } catch (err) {
-      if (orderRef) {
-        try {
-          await updateDoc(orderRef, {
-            paymentStatus: 'ERROR',
-            paymentError: err?.message || 'Payment initialization failed.',
-          });
-        } catch {}
-      }
-      alert(err?.message || 'পেমেন্ট শুরু করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      alert(err?.message || 'অর্ডার সাবমিট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     } finally {
       setOrderSubmitting(false);
     }
@@ -3061,13 +2953,6 @@ export default function App() {
         </div>
       </div>
     );
-  }
-
-  if (currentView === 'payment-result') {
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('payment') === 'cancelled' ? 'cancelled' : 'success';
-    const invoiceId = params.get('invoice_id') || params.get('invoiceId') || '';
-    return <PaymentResult mode={mode} invoiceId={invoiceId} onBackHome={() => { window.history.replaceState(null, '', window.location.pathname); setCurrentView('home'); }} />;
   }
 
   if (currentView === 'track') {
@@ -3508,11 +3393,34 @@ export default function App() {
           )}
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-            <h3 className="text-lg font-bold mb-3 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-red-600" /> নিরাপদ অনলাইন পেমেন্ট</h3>
-            <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-              <p className="font-bold text-gray-900">UddoktaPay</p>
-              <p className="text-sm text-gray-600 mt-1 leading-6">অর্ডার নিশ্চিত করার পর আপনাকে UddoktaPay-এর secure checkout page-এ পাঠানো হবে। সেখানে bKash, Nagad, Rocket, Upay বা উপলব্ধ অন্যান্য payment method থেকে পেমেন্ট সম্পন্ন করতে পারবেন।</p>
-              <p className="text-xs text-gray-500 mt-3">পেমেন্ট সফল হলে invoice ও transaction তথ্য স্বয়ংক্রিয়ভাবে যাচাই করে অর্ডার Confirm করা হবে।</p>
+            <h3 className="text-lg font-bold mb-3 flex items-center"><CreditCard className="h-5 w-5 mr-2 text-red-600" /> বিকাশ / নগদ পেমেন্ট (Send Money)</h3>
+
+            <div className="flex gap-3 mb-4">
+              <button type="button" onClick={() => setPaymentMethod('bkash')}
+                className={`flex-1 py-2.5 rounded-lg font-bold text-sm border-2 transition-colors ${paymentMethod === 'bkash' ? 'border-pink-500 bg-pink-50 text-pink-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                bKash
+              </button>
+              <button type="button" onClick={() => setPaymentMethod('nagad')}
+                className={`flex-1 py-2.5 rounded-lg font-bold text-sm border-2 transition-colors ${paymentMethod === 'nagad' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                Nagad
+              </button>
+            </div>
+
+            <div className={`rounded-xl p-4 border ${paymentMethod === 'bkash' ? 'bg-pink-50 border-pink-100' : 'bg-orange-50 border-orange-100'}`}>
+              <p className="text-sm text-gray-700 mb-2">
+                নিচের <strong>{paymentMethod === 'bkash' ? 'bKash' : 'Nagad'} নম্বরে</strong> সর্বমোট <strong>৳ {estimatedGrandTotal.toLocaleString('en-BD')}</strong> টাকা <strong>&quot;Send Money&quot;</strong> করুন:
+              </p>
+              <CopyableNumber number={PAYMENT_NUMBERS[paymentMethod]} />
+              <p className="text-xs text-gray-500 mt-3 leading-6">Send Money করার পর যে নম্বর থেকে টাকা পাঠিয়েছেন সেই নম্বর এবং SMS-এ পাওয়া Transaction ID (TrxID) নিচে দিন। TrxID যাচাই করে আপনার অর্ডার Confirm করা হবে।</p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder={`যে নম্বর থেকে Send Money করেছেন *`}
+                className="w-full border rounded-lg p-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
+              <input value={trxId} onChange={(e) => setTrxId(e.target.value.toUpperCase())}
+                placeholder="Transaction ID (TrxID) *"
+                className="w-full border rounded-lg p-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
             </div>
           </div>
           <button onClick={handleConfirmOrder} disabled={cart.length === 0 || orderSubmitting}
