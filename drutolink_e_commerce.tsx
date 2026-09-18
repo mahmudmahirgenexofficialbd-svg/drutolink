@@ -2338,23 +2338,36 @@ export default function App() {
 
   useEffect(() => {
     setStorefrontLoading(true);
+    // ফিক্স: category filter + orderBy('createdAt') একসাথে থাকলে Firestore-এর
+    // composite index লাগে, যা এই প্রজেক্টে তৈরি করা নেই — ফলে ক্যাটাগরি সিলেক্ট
+    // করলে কোয়েরি silently fail করে প্রোডাক্ট খালি দেখাচ্ছিল।
+    // সমাধান: ক্যাটাগরি সিলেক্ট থাকলে orderBy বাদ দিয়ে (index লাগবে না),
+    // ডাটা আসার পরে createdAt দিয়ে নিজে sort করে দেওয়া হচ্ছে।
     const storefrontQuery = selectedCategory
       ? query(
           collection(db, 'products'),
           where('category', '==', selectedCategory),
-          orderBy('createdAt', 'desc'),
           limit(storefrontLimit)
         )
       : query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(storefrontLimit));
 
     const unsub = onSnapshot(storefrontQuery, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      let docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (selectedCategory) {
+        // ক্লায়েন্ট সাইডে সর্ট (নতুন প্রোডাক্ট আগে দেখানোর জন্য)
+        docs = docs.slice().sort((a, b) => {
+          const aTime = a.createdAt?.seconds || a.createdAt?.toMillis?.() || 0;
+          const bTime = b.createdAt?.seconds || b.createdAt?.toMillis?.() || 0;
+          return bTime - aTime;
+        });
+      }
       setStorefrontProducts(docs);
       // limit()-এর সমান বা বেশি ডকুমেন্ট এলে ধরে নিচ্ছি আরও থাকতে পারে
       setStorefrontHasMore(docs.length >= storefrontLimit);
       setStorefrontLoading(false);
       setLoadingMoreProducts(false);
-    }, () => {
+    }, (err) => {
+      console.error('Storefront products query failed:', err);
       setStorefrontLoading(false);
       setLoadingMoreProducts(false);
     });
@@ -2899,10 +2912,7 @@ export default function App() {
         throw new Error(`সার্ভার থেকে সঠিক JSON response পাওয়া যায়নি (HTTP ${response.status})।`);
       }
       if (!response.ok || data?.status === false || !data?.payment_url) {
-        // Vercel platform errors look like { error: { code, message } }, so read those too.
-        const serverMsg = data?.message || data?.error?.message || (typeof data?.error === 'string' ? data.error : '');
-        const code = data?.error?.code ? `, ${data.error.code}` : '';
-        throw new Error(serverMsg ? String(serverMsg) : `UddoktaPay payment link তৈরি করা যায়নি (HTTP ${response.status}${code})।`);
+        throw new Error(data?.message || 'UddoktaPay payment link তৈরি করা যায়নি।');
       }
 
       await updateDoc(orderRef, {
