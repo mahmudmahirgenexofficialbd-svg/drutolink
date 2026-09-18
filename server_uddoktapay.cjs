@@ -1,4 +1,5 @@
-const UDDOKTAPAY_BASE_URL = (process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com').replace(/\/$/, '');
+const rawBaseUrl = (process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com').replace(/\/$/, '');
+const UDDOKTAPAY_BASE_URL = /\/api$/i.test(rawBaseUrl) ? rawBaseUrl : `${rawBaseUrl}/api`;
 const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY;
 
 function json(statusCode, body) {
@@ -17,7 +18,7 @@ async function uddoktaRequest(path, payload) {
     throw new Error('UDDOKTAPAY_API_KEY is not configured on the server.');
   }
 
-  const response = await fetch(`${UDDOKTAPAY_BASE_URL}/api/${path}`, {
+  const response = await fetch(`${UDDOKTAPAY_BASE_URL}/${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -64,10 +65,10 @@ async function createCharge(body) {
     full_name: fullName,
     email,
     amount,
-    metadata: {
+    metadata: JSON.stringify({
       order_id: orderId,
       source: 'DrutoLink',
-    },
+    }),
     redirect_url: `${origin}/?payment=success`,
     return_type: 'GET',
     cancel_url: `${origin}/?payment=cancelled`,

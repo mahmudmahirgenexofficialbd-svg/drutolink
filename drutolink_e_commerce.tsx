@@ -2142,7 +2142,13 @@ function PaymentResult({ mode, invoiceId, onBackHome }) {
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ invoice_id: invoiceId }),
         });
-        const data = await response.json();
+        const responseText = await response.text();
+        let data = {};
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch {
+          throw new Error(`সার্ভার থেকে সঠিক JSON response পাওয়া যায়নি (HTTP ${response.status})।`);
+        }
         if (!response.ok || data?.status === false) {
           throw new Error(data?.message || 'পেমেন্ট যাচাই ব্যর্থ হয়েছে।');
         }
@@ -2885,7 +2891,13 @@ export default function App() {
           origin: window.location.origin,
         }),
       });
-      const data = await response.json();
+      const responseText = await response.text();
+      let data = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(`সার্ভার থেকে সঠিক JSON response পাওয়া যায়নি (HTTP ${response.status})।`);
+      }
       if (!response.ok || data?.status === false || !data?.payment_url) {
         throw new Error(data?.message || 'UddoktaPay payment link তৈরি করা যায়নি।');
       }
