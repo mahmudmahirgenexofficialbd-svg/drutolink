@@ -40,3 +40,12 @@ The API endpoints are:
 ## 4. After changing Environment Variables
 
 Redeploy the Vercel project so the serverless functions receive the new values.
+
+## 5. Troubleshooting "payment link তৈরি করা যায়নি"
+
+1. Open `https://YOUR-SITE/api/uddoktapay/health` in a browser.
+   - JSON with `"apiKeyConfigured": true` and the right `baseUrl` → functions are deployed and env vars are visible.
+   - 404 / `NOT_FOUND` / `FUNCTION_INVOCATION_FAILED` → the `api/` folder is not deployed (check Vercel → Settings → General → Root Directory, and that `api/` is at that root).
+   - `"apiKeyConfigured": false` → add `UDDOKTAPAY_API_KEY` for the correct environment (Production/Preview) and redeploy.
+2. Try checkout again — the alert now shows the real reason (UddoktaPay's own message, or the HTTP status).
+3. Vercel → your project → Logs → filter `/api/uddoktapay/create` for the full server-side error.

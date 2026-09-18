@@ -2899,7 +2899,10 @@ export default function App() {
         throw new Error(`সার্ভার থেকে সঠিক JSON response পাওয়া যায়নি (HTTP ${response.status})।`);
       }
       if (!response.ok || data?.status === false || !data?.payment_url) {
-        throw new Error(data?.message || 'UddoktaPay payment link তৈরি করা যায়নি।');
+        // Vercel platform errors look like { error: { code, message } }, so read those too.
+        const serverMsg = data?.message || data?.error?.message || (typeof data?.error === 'string' ? data.error : '');
+        const code = data?.error?.code ? `, ${data.error.code}` : '';
+        throw new Error(serverMsg ? String(serverMsg) : `UddoktaPay payment link তৈরি করা যায়নি (HTTP ${response.status}${code})।`);
       }
 
       await updateDoc(orderRef, {
