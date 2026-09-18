@@ -2,6 +2,24 @@
   command = "npm run build"
   publish = "dist"
 
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/uddoktapay/create"
+  to = "/.netlify/functions/uddoktapay-create"
+  status = 200
+
+[[redirects]]
+  from = "/api/uddoktapay/verify"
+  to = "/.netlify/functions/uddoktapay-verify"
+  status = 200
+
+[[redirects]]
+  from = "/api/uddoktapay/webhook"
+  to = "/.netlify/functions/uddoktapay-webhook"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

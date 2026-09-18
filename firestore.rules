@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == 'admin@drutolink.com';
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isWorker() {
+      return signedIn() && exists(/databases/$(database)/documents/workers/$(request.auth.uid));
+    }
+
+    // PRODUCTS: storefront can read products. Admin manages all products.
+    // Workers may create/delete only their own listings.
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        isWorker() && request.resource.data.createdBy == request.auth.uid
+      );
+      allow update, delete: if isAdmin() || (
+        isWorker() && resource.data.createdBy == request.auth.uid
+      );
+    }
+
+    // CUSTOMER PROFILES
+    match /customers/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // WORKER PROFILES
+    match /workers/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || isOwner(uid);
+      allow delete: if isAdmin();
+    }
+
+    // ORDERS
+    // Customers can create their own order and read their own orders.
+    // The current frontend also updates payment result fields after UddoktaPay
+    // verification, so authenticated customers are allowed to update their own
+    // order documents. Final payment security should be moved to a trusted
+    // server/Firebase Admin SDK before production.
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (
+        signedIn() && resource.data.customerId == request.auth.uid
+      );
+
+      allow create: if isAdmin() || (
+        signedIn() && request.resource.data.customerId == request.auth.uid
+      );
+
+      allow update: if isAdmin() || (
+        signedIn() && resource.data.customerId == request.auth.uid
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // WORKER WITHDRAWAL REQUESTS
+    match /withdrawalRequests/{requestId} {
+      allow read: if isAdmin() || (
+        signedIn() && resource.data.workerId == request.auth.uid
+      );
+
+      allow create: if isAdmin() || (
+        isWorker() && request.resource.data.workerId == request.auth.uid
+      );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // Deny every other collection by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
