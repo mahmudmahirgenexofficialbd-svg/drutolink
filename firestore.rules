@@ -48,11 +48,9 @@ service cloud.firestore {
     }
 
     // ORDERS
-    // Customers can create their own order and read their own orders.
-    // The current frontend also updates payment result fields after UddoktaPay
-    // verification, so authenticated customers are allowed to update their own
-    // order documents. Final payment security should be moved to a trusted
-    // server/Firebase Admin SDK before production.
+    // Customers can create their own order (with manual bKash/Nagad sender
+    // number + TrxID) and read/update their own orders. Admin verifies the
+    // TrxID manually and confirms/updates the order from the admin panel.
     match /orders/{orderId} {
       allow read: if isAdmin() || (
         signedIn() && resource.data.customerId == request.auth.uid
