@@ -80,6 +80,17 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // WORKER PAYMENTS
+    // অ্যাডমিন একজন কর্মীকে পেমেন্ট দেওয়ার পর এখানে পরিমাণ ও স্ক্রিনশট রেকর্ড করে।
+    // শুধু অ্যাডমিনই তৈরি/আপডেট/ডিলিট করতে পারে; কর্মী শুধু নিজের পেমেন্টগুলো পড়তে পারে।
+    match /workerPayments/{paymentId} {
+      allow read: if isAdmin() || (
+        signedIn() && resource.data.workerId == request.auth.uid
+      );
+
+      allow create, update, delete: if isAdmin();
+    }
+
     // Deny every other collection by default.
     match /{document=**} {
       allow read, write: if false;
