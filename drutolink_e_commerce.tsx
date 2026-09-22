@@ -2441,6 +2441,7 @@ export default function App() {
 
   const [products, setProducts] = useState([]);
   const [productsLoadError, setProductsLoadError] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false); // পুরো ক্যাটালগ (টেক্সট-সার্চের জন্য) লোড হচ্ছে কিনা
   const [orders, setOrders] = useState([]);
 
   // পুরো ক্যাটালগ (সব প্রোডাক্ট, কোনো limit ছাড়া) শুধু admin/worker ড্যাশবোর্ড আর
@@ -2450,17 +2451,20 @@ export default function App() {
   // তার পেছনে আটকে থেকে দেরিতে আসত — এই কারণেই প্রথমবার সাইট খোলার সাথে সাথে
   // প্রোডাক্ট দেখা যাচ্ছিল না, "আরও দেখুন"-এ ক্লিক করার পর (যা নতুন করে কানেকশন
   // ট্রিগার করত) হঠাৎ দেখা যেত। তাই এখন এই ভারী লিস্টেনারটা তখনই চালু হয় যখন
-  // সত্যিই দরকার (অ্যাডমিন/ওয়ার্কার প্যানেল খোলা হলে, বা ছবি-সার্চ ব্যবহার করা হলে)।
+  // সত্যিই দরকার (অ্যাডমিন/ওয়ার্কার প্যানেল খোলা হলে, টেক্সট/ছবি-সার্চ ব্যবহার করা হলে)।
   const [catalogNeeded, setCatalogNeeded] = useState(false);
 
   useEffect(() => {
     if (!catalogNeeded) return;
+    setCatalogLoading(true);
     const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setProductsLoadError(false);
       setProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setCatalogLoading(false);
     }, () => {
       setProductsLoadError(true);
+      setCatalogLoading(false);
     });
     return () => unsub();
   }, [catalogNeeded]);
@@ -2523,6 +2527,15 @@ export default function App() {
   // ক্যাটাগরি বদলানোর সময় এটা কল করলে লিমিট ২০-তে রিসেট হয়ে যায়, নাহলে আগের
   // ক্যাটাগরিতে "আরও দেখুন" চেপে বাড়ানো লিমিট নতুন ক্যাটাগরিতেও থেকে যেত
   const resetStorefrontPaging = () => setStorefrontLimit(STOREFRONT_PAGE_SIZE);
+
+  // ফিক্স: আগে টেক্সট-সার্চ শুধু storefrontProducts (হোমপেজে যতটুকু ইতিমধ্যে
+  // লোড হয়েছে, ডিফল্ট ২০টা) এর মধ্যে খুঁজত — ফলে খোঁজা প্রোডাক্ট ওই প্রথম ২০টার
+  // মধ্যে না থাকলে "কোনো প্রোডাক্ট পাওয়া যায়নি" দেখাত, যদিও প্রোডাক্টটা আসলে
+  // ডাটাবেজে ছিল। সমাধান: সার্চ বক্সে কিছু লেখা হলে পুরো ক্যাটালগ (catalogNeeded)
+  // লোড করে সেখান থেকে খোঁজা হচ্ছে, শুধু হোমপেজের ছোট পেজিনেটেড লিস্ট থেকে না।
+  useEffect(() => {
+    if (searchQuery.trim()) setCatalogNeeded(true);
+  }, [searchQuery]);
 
   // ছবি দিয়ে প্রোডাক্ট খোঁজা — পুরোটাই ব্রাউজারে চলে, কোনো API লাগে না (visualSearch.ts দেখুন)
   const visual = useVisualSearch(products);
@@ -2652,6 +2665,10 @@ export default function App() {
 
   // Worker payments — admin পাঠানো পেমেন্টের রেকর্ড (পরিমাণ + স্ক্রিনশট)।
   // অ্যাডমিন সব পেমেন্ট দেখে, একজন কর্মী শুধু নিজের পেমেন্টগুলো দেখে।
+  // ফিক্স: where('workerId', ...) + orderBy('createdAt', ...) একসাথে থাকলে
+  // Firestore-এর কম্পোজিট ইনডেক্স লাগে যা এই নতুন কালেকশনে তৈরি করা নেই — তাই
+  // কর্মীর কোয়েরি থেকে orderBy বাদ দিয়ে ডাটা আসার পর নিজে sort করে দেওয়া হচ্ছে
+  // (ঠিক যেভাবে products-এর category ফিল্টারেও একই সমস্যা এড়ানো হয়েছে)।
   const [workerPayments, setWorkerPayments] = useState([]);
   useEffect(() => {
     if (!authUser) { setWorkerPayments([]); return; }
@@ -2659,11 +2676,19 @@ export default function App() {
     if (isAdminLoggedIn) {
       q = query(collection(db, 'workerPayments'), orderBy('createdAt', 'desc'));
     } else if (isWorkerLoggedIn) {
-      q = query(collection(db, 'workerPayments'), where('workerId', '==', authUser.uid), orderBy('createdAt', 'desc'));
+      q = query(collection(db, 'workerPayments'), where('workerId', '==', authUser.uid));
     }
     if (!q) { setWorkerPayments([]); return; }
     const unsub = onSnapshot(q, (snapshot) => {
-      setWorkerPayments(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      let docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (isWorkerLoggedIn) {
+        docs = docs.slice().sort((a, b) => {
+          const aTime = a.createdAt?.seconds || a.createdAt?.toMillis?.() || 0;
+          const bTime = b.createdAt?.seconds || b.createdAt?.toMillis?.() || 0;
+          return bTime - aTime;
+        });
+      }
+      setWorkerPayments(docs);
     }, () => {
       setWorkerPayments([]);
     });
@@ -3104,8 +3129,8 @@ export default function App() {
     else { setRedirectAfterLogin('track'); setCurrentView('login'); }
   };
 
-  // ছবি-সার্চ চালু থাকলে সেটাই অগ্রাধিকার পায় — মিলের ক্রমে সাজানো ফল দেখায়।
-  // তখন লেখা-সার্চ ও ক্যাটাগরি ফিল্টার বাদ থাকে, নইলে ফল প্রায় সবসময় খালি আসত।
+  // ছবি-সার্চ চালু থাকলে সেটাই অগ্রাধিকার পায়। টেক্সট-সার্চ চালু থাকলে পুরো
+  // ক্যাটালগ (products) থেকে খোঁজে, নাহলে হোমপেজের পেজিনেটেড লিস্ট (storefrontProducts) দেখায়।
   const visibleProducts = visual.active
     ? (visual.matches || [])
         .map((m) => {
@@ -3113,7 +3138,9 @@ export default function App() {
           return p ? { ...p, _matchScore: m.score } : null;
         })
         .filter(Boolean)
-    : storefrontProducts.filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+    : searchQuery.trim()
+      ? products.filter((p) => p.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+      : storefrontProducts;
 
   if (!authChecked && currentView === 'admin') {
     return <div className="min-h-screen flex items-center justify-center text-gray-500 font-body">লোড হচ্ছে...</div>;
@@ -3845,7 +3872,7 @@ export default function App() {
                 </div>
               ) : (
                 <p className="text-gray-500 text-sm">
-                  {storefrontLoading ? 'লোড হচ্ছে...' : <>কোনো প্রোডাক্ট পাওয়া যায়নি। {storefrontProducts.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</>}
+                  {(searchQuery.trim() ? catalogLoading : storefrontLoading) ? 'লোড হচ্ছে...' : <>কোনো প্রোডাক্ট পাওয়া যায়নি। {storefrontProducts.length === 0 && 'অ্যাডমিন প্যানেল থেকে প্রোডাক্ট যোগ করুন।'}</>}
                 </p>
               )
             ) : (
