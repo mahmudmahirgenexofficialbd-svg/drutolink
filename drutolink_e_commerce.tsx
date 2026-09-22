@@ -1060,7 +1060,7 @@ function OverviewTab({ products, orders, workers, withdrawalRequests }) {
   );
 }
 
-function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal }) {
+function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal, workerPayments, handleAddWorkerPayment }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
 
@@ -1096,6 +1096,63 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
       setWorkerSaving(false);
     }
   };
+
+  // --- কর্মীকে পেমেন্ট দেওয়ার (রেকর্ড রাখার) ফর্ম state ---
+  const [paymentWorkerId, setPaymentWorkerId] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [paymentScreenshot, setPaymentScreenshot] = useState('');
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentFormError, setPaymentFormError] = useState('');
+
+  // পেমেন্ট স্ক্রিনশট বড় হলে Firestore ডকুমেন্টে (১ MB লিমিট) সমস্যা হতে পারে,
+  // তাই ক্যানভাসে রিসাইজ করে হালকা JPEG বানিয়ে তারপর base64 হিসেবে সেভ করা হয়।
+  const handlePaymentScreenshotUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 900;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setPaymentScreenshot(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onAddWorkerPayment = async (e) => {
+    e.preventDefault();
+    setPaymentFormError('');
+    if (!paymentWorkerId) { setPaymentFormError('কর্মী নির্বাচন করুন।'); return; }
+    if (!paymentAmount || Number(paymentAmount) <= 0) { setPaymentFormError('সঠিক পেমেন্ট পরিমাণ দিন।'); return; }
+    if (!paymentScreenshot) { setPaymentFormError('পেমেন্টের স্ক্রিনশট আপলোড করুন।'); return; }
+    setPaymentSaving(true);
+    try {
+      const worker = workers.find((w) => w.id === paymentWorkerId);
+      await handleAddWorkerPayment({
+        workerId: paymentWorkerId,
+        workerName: worker?.name || '',
+        amount: paymentAmount,
+        note: paymentNote,
+        screenshot: paymentScreenshot,
+      });
+      setPaymentWorkerId(''); setPaymentAmount(''); setPaymentNote(''); setPaymentScreenshot('');
+      alert('পেমেন্ট রেকর্ড সেভ হয়েছে। কর্মী এখন তার অ্যাকাউন্টে এটি দেখতে পাবে।');
+    } catch (err) {
+      setPaymentFormError(err?.message || 'পেমেন্ট সেভ করা যায়নি। আবার চেষ্টা করুন।');
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [estimatedWeightKg, setEstimatedWeightKg] = useState('');
@@ -1207,6 +1264,29 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     await updateDoc(doc(db, 'orders', orderId), { status });
   };
 
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+
+  const toggleOrderSelected = (orderId) => {
+    setSelectedOrderIds((prev) => prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]);
+  };
+
+  const toggleSelectAllOrders = () => {
+    setSelectedOrderIds((prev) => prev.length === orders.length ? [] : orders.map((o) => o.id));
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('এই অর্ডারটি স্থায়ীভাবে মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না।')) return;
+    await deleteDoc(doc(db, 'orders', orderId));
+    setSelectedOrderIds((prev) => prev.filter((id) => id !== orderId));
+  };
+
+  const handleDeleteSelectedOrders = async () => {
+    if (selectedOrderIds.length === 0) return;
+    if (!window.confirm(`নির্বাচিত ${selectedOrderIds.length}টি অর্ডার স্থায়ীভাবে মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না।`)) return;
+    await Promise.all(selectedOrderIds.map((id) => deleteDoc(doc(db, 'orders', id))));
+    setSelectedOrderIds([]);
+  };
+
   const handleUpdateOrderShipping = async (orderId, actualWeightKg) => {
     const weight = Number(actualWeightKg);
     if (!Number.isFinite(weight) || weight <= 0) throw new Error('সঠিক প্রকৃত ওজন দিন।');
@@ -1291,7 +1371,16 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
           )}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">সাম্প্রতিক অর্ডার (ম্যানুয়াল যাচাই)</h3>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="text-lg font-bold">সাম্প্রতিক অর্ডার (ম্যানুয়াল যাচাই)</h3>
+                {selectedOrderIds.length > 0 && (
+                  <button onClick={handleDeleteSelectedOrders}
+                    className="flex items-center space-x-1 text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded text-sm font-semibold">
+                    <Trash2 className="h-4 w-4" />
+                    <span>নির্বাচিত {selectedOrderIds.length}টি অর্ডার মুছুন</span>
+                  </button>
+                )}
+              </div>
               {orders.length === 0 ? (
                 <p className="text-gray-500 text-sm">এখনো কোনো অর্ডার আসেনি।</p>
               ) : (
@@ -1299,6 +1388,9 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
+                      <th className="p-4 font-medium">
+                        <input type="checkbox" checked={selectedOrderIds.length === orders.length && orders.length > 0} onChange={toggleSelectAllOrders} className="h-4 w-4" />
+                      </th>
                       <th className="p-4 font-medium">প্রোডাক্ট</th>
                       <th className="p-4 font-medium">পেমেন্ট (TrxID)</th>
                       <th className="p-4 font-medium">ডেলিভারি / শিপিং</th>
@@ -1309,6 +1401,9 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                   <tbody>
                     {orders.map((o) => (
                       <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
+                        <td className="p-4">
+                          <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => toggleOrderSelected(o.id)} className="h-4 w-4" />
+                        </td>
                         <td className="p-4 text-sm">
                           {(o.items || []).map((it, idx) => (
                             <p key={idx} className="font-semibold">
@@ -1355,11 +1450,16 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                             {ORDER_STAGES.map((stage) => <option key={stage}>{stage}</option>)}
                           </select>
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 space-y-2">
                           <button onClick={() => handleUpdateStatus(o.id, 'Order Placed')}
-                            className="flex items-center space-x-1 text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded text-sm">
+                            className="flex items-center space-x-1 text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded text-sm w-full justify-center">
                             <CheckCircle className="h-4 w-4" />
                             <span>Approve</span>
+                          </button>
+                          <button onClick={() => handleDeleteOrder(o.id)}
+                            className="flex items-center space-x-1 text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded text-sm w-full justify-center">
+                            <Trash2 className="h-4 w-4" />
+                            <span>মুছুন</span>
                           </button>
                         </td>
                       </tr>
@@ -1565,6 +1665,88 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 )}
               </div>
 
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6 max-w-xl">
+                <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-red-600" /> কর্মীকে পেমেন্ট দিন
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">bKash/Nagad/ব্যাংকে সরাসরি টাকা পাঠানোর পর এখানে পরিমাণ ও পেমেন্টের স্ক্রিনশট আপলোড করুন — কর্মী তার অ্যাকাউন্টে এই রেকর্ড দেখতে পাবে।</p>
+                <form onSubmit={onAddWorkerPayment} className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">কর্মী নির্বাচন করুন</label>
+                    <select value={paymentWorkerId} onChange={(e) => setPaymentWorkerId(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150 bg-white">
+                      <option value="">-- কর্মী বাছাই করুন --</option>
+                      {workers.map((w) => <option key={w.id} value={w.id}>{w.name || w.email}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">পেমেন্টের পরিমাণ (টাকা)</label>
+                    <input type="number" min="1" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ 2000" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">নোট (ঐচ্ছিক)</label>
+                    <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ সেপ্টেম্বর মাসের পেমেন্ট" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">পেমেন্টের স্ক্রিনশট</label>
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <input type="file" accept="image/*" onChange={handlePaymentScreenshotUpload}
+                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer" />
+                    </div>
+                    {paymentScreenshot && (
+                      <div className="mt-3 flex items-center space-x-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                        <img src={paymentScreenshot} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                        <button type="button" onClick={() => setPaymentScreenshot('')} className="text-xs text-red-600 hover:underline">সরিয়ে ফেলুন</button>
+                      </div>
+                    )}
+                  </div>
+                  {paymentFormError && <p className="text-red-600 text-xs">{paymentFormError}</p>}
+                  <button type="submit" disabled={paymentSaving} className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
+                    {paymentSaving ? 'সেভ হচ্ছে...' : 'পেমেন্ট রেকর্ড সেভ করুন'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
+                <h3 className="text-lg font-bold mb-4">পেমেন্ট হিস্টোরি ({workerPayments.length})</h3>
+                {workerPayments.length === 0 ? (
+                  <p className="text-gray-500 text-sm">এখনো কোনো পেমেন্ট রেকর্ড করা হয়নি।</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600 text-sm border-y border-gray-200">
+                          <th className="p-3 font-medium">কর্মী</th>
+                          <th className="p-3 font-medium">পরিমাণ</th>
+                          <th className="p-3 font-medium">নোট</th>
+                          <th className="p-3 font-medium">তারিখ</th>
+                          <th className="p-3 font-medium">স্ক্রিনশট</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workerPayments.map((p) => (
+                          <tr key={p.id} className="border-b border-gray-100 align-middle">
+                            <td className="p-3 text-sm font-semibold">{p.workerName || '—'}</td>
+                            <td className="p-3 text-sm text-red-600 font-bold">৳ {Number(p.amount || 0).toLocaleString('en-BD')}</td>
+                            <td className="p-3 text-xs text-gray-500">{p.note || '—'}</td>
+                            <td className="p-3 text-xs text-gray-500">{toJsDate(p.createdAt)?.toLocaleString('bn-BD') || '—'}</td>
+                            <td className="p-3">
+                              {p.screenshot && (
+                                <a href={p.screenshot} target="_blank" rel="noopener noreferrer">
+                                  <img src={p.screenshot} alt="Payment proof" className="h-12 w-12 object-cover rounded border hover:opacity-80" />
+                                </a>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
                 <h3 className="text-lg font-bold mb-4">
                   পেমেন্ট / উত্তোলনের অনুরোধ
@@ -1761,7 +1943,7 @@ function WorkerCard({ worker, productCount, onSaveSettings, onDeleteWorker }) {
 }
 
 // --- WORKER DASHBOARD (product-listing-only access) ---
-function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, handleAddWorkerProduct, handleDeleteWorkerProduct, myWithdrawalRequests, handleRequestWithdrawal }) {
+function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, handleAddWorkerProduct, handleDeleteWorkerProduct, myWithdrawalRequests, handleRequestWithdrawal, myPayments }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -2096,6 +2278,33 @@ function WorkerDashboard({ goHome, handleLogout, workerProfile, myProducts, hand
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
+              <h3 className="text-lg font-bold mb-4">আমার পেমেন্ট ({myPayments.length} টি)</h3>
+              {myPayments.length === 0 ? (
+                <p className="text-sm text-gray-500">এখনো কোনো পেমেন্ট রেকর্ড করা হয়নি।</p>
+              ) : (
+                <div className="space-y-3">
+                  {myPayments.map((p) => {
+                    const d = toJsDate(p.createdAt);
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 border border-gray-100 rounded-lg p-3 bg-gray-50">
+                        {p.screenshot && (
+                          <a href={p.screenshot} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                            <img src={p.screenshot} alt="Payment proof" className="h-14 w-14 object-cover rounded border hover:opacity-80" />
+                          </a>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-red-600">৳ {Number(p.amount || 0).toLocaleString('en-BD')}</p>
+                          {p.note && <p className="text-xs text-gray-600 truncate">{p.note}</p>}
+                          <p className="text-[11px] text-gray-400">{d ? d.toLocaleString('bn-BD') : '—'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-shadow duration-200 hover:shadow-md p-6">
               <h3 className="text-lg font-bold mb-4">আমার লিস্ট করা প্রোডাক্ট ({myProducts.length} টি)</h3>
               {myProducts.length === 0 ? (
                 <p className="text-gray-500 text-sm">আপনি এখনো কোনো প্রোডাক্ট যোগ করেননি।</p>
@@ -2156,12 +2365,17 @@ function CopyableNumber({ number }) {
 
 // --- MAIN STOREFRONT & PASSWORD GATE COMPONENT ---
 export default function App() {
-  // পণ্য বাড়ার সাথে সাথে ফুটার অনেক নিচে চলে যায়, তাই worker/admin প্যানেলে
-  // সরাসরি URL হ্যাশ (#worker, #admin) দিয়ে ঢোকা যাবে — স্ক্রল করার দরকার নেই।
+  // অ্যাডমিন/ওয়ার্কার প্যানেলে সরাসরি ঢোকার একমাত্র পথ এখন URL —
+  // https://drutolink.shop/admin এবং https://drutolink.shop/worker।
+  // সাইটে আর কোনো "স্টাফ" বাটন/লিংক নেই, তাই লিংক দুটো যাদের জানা আছে শুধু তারাই ঢুকতে পারবে।
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
+      const p = window.location.pathname.replace(/\/+$/, ''); // শেষের স্ল্যাশ বাদ
+      if (p === '/admin') return 'admin';
+      if (p === '/worker') return 'worker';
+      // পুরনো #admin / #worker হ্যাশ লিংক থেকে এলেও যেন কাজ করে (ব্যাকওয়ার্ড কম্প্যাটিবিলিটি)
       const h = window.location.hash.replace('#', '');
-      return (h === 'admin' || h === 'worker') ? h : 'home';
+      if (h === 'admin' || h === 'worker') return h;
     }
     return 'home';
   });
@@ -2178,7 +2392,6 @@ export default function App() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryPhone, setDeliveryPhone] = useState('');
   const [orderSubmitting, setOrderSubmitting] = useState(false);
-  const [staffMenuOpen, setStaffMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false); // মোবাইলে হেডারের ৩-বার আইকনে ক্লিক করলে এই ড্রয়ার খোলে
 
   // সাইটে ঢোকার সাথে সাথেই প্রোমো পপ-আপ দেখায় (শুধু হোম পেজে)। একবার বন্ধ করলে
@@ -2199,15 +2412,32 @@ export default function App() {
   const productsRef = useRef(null);
   const howItWorksRef = useRef(null);
 
-  // currentView admin/worker হলে URL হ্যাশ আপডেট রাখি, যাতে লিংকটা বুকমার্ক করা যায়
-  // এবং রিফ্রেশ দিলেও সরাসরি প্যানেলে ঢোকা যায় — ফুটার পর্যন্ত স্ক্রল করা লাগবে না।
+  // currentView admin/worker হলে URL পাথ (/admin বা /worker) আপডেট রাখি, যাতে
+  // লিংকটা বুকমার্ক করা যায় এবং রিফ্রেশ দিলেও সরাসরি প্যানেলে ঢোকা যায়।
+  // হোমে ফিরলে পাথ আবার "/"-এ রিসেট হয়ে যায়।
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (currentView === 'admin' || currentView === 'worker') {
-      if (window.location.hash !== `#${currentView}`) window.location.hash = currentView;
-    } else if (window.location.hash === '#admin' || window.location.hash === '#worker') {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+      const targetPath = `/${currentView}`;
+      if (window.location.pathname !== targetPath) {
+        history.pushState(null, '', targetPath + window.location.search);
+      }
+    } else if (window.location.pathname === '/admin' || window.location.pathname === '/worker') {
+      history.pushState(null, '', '/' + window.location.search);
     }
   }, [currentView]);
+
+  // ব্রাউজারের Back/Forward বাটন চাপলেও currentView URL পাথের সাথে সিঙ্ক থাকে।
+  useEffect(() => {
+    const onPopState = () => {
+      const p = window.location.pathname.replace(/\/+$/, '');
+      if (p === '/admin') setCurrentView('admin');
+      else if (p === '/worker') setCurrentView('worker');
+      else setCurrentView('home');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const [products, setProducts] = useState([]);
   const [productsLoadError, setProductsLoadError] = useState(false);
@@ -2416,6 +2646,26 @@ export default function App() {
       setWithdrawalRequests(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => {
       setWithdrawalRequests([]);
+    });
+    return () => unsub();
+  }, [authUser, isAdminLoggedIn, isWorkerLoggedIn]);
+
+  // Worker payments — admin পাঠানো পেমেন্টের রেকর্ড (পরিমাণ + স্ক্রিনশট)।
+  // অ্যাডমিন সব পেমেন্ট দেখে, একজন কর্মী শুধু নিজের পেমেন্টগুলো দেখে।
+  const [workerPayments, setWorkerPayments] = useState([]);
+  useEffect(() => {
+    if (!authUser) { setWorkerPayments([]); return; }
+    let q = null;
+    if (isAdminLoggedIn) {
+      q = query(collection(db, 'workerPayments'), orderBy('createdAt', 'desc'));
+    } else if (isWorkerLoggedIn) {
+      q = query(collection(db, 'workerPayments'), where('workerId', '==', authUser.uid), orderBy('createdAt', 'desc'));
+    }
+    if (!q) { setWorkerPayments([]); return; }
+    const unsub = onSnapshot(q, (snapshot) => {
+      setWorkerPayments(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {
+      setWorkerPayments([]);
     });
     return () => unsub();
   }, [authUser, isAdminLoggedIn, isWorkerLoggedIn]);
@@ -2717,6 +2967,25 @@ export default function App() {
     });
   };
 
+  // অ্যাডমিন একজন কর্মীকে ম্যানুয়ালি পেমেন্ট (bKash/Nagad/ব্যাংক) দেওয়ার পর
+  // এখান থেকে পরিমাণ ও পেমেন্টের স্ক্রিনশট আপলোড করে রেকর্ড রাখে। এটা withdrawal
+  // request-এর সাথে যুক্ত নাও থাকতে পারে (যেমন বোনাস/অ্যাডভান্স পেমেন্ট) — তাই
+  // আলাদা কালেকশনে রাখা হয়েছে, আর কর্মীর ড্যাশবোর্ডে শুধু নিজেরটা দেখা যায়।
+  const handleAddWorkerPayment = async ({ workerId, workerName, amount, note, screenshot }) => {
+    const numericAmount = Number(amount || 0);
+    if (!workerId) throw new Error('কর্মী নির্বাচন করুন।');
+    if (!numericAmount || numericAmount <= 0) throw new Error('সঠিক পেমেন্ট পরিমাণ দিন।');
+    if (!screenshot) throw new Error('পেমেন্টের স্ক্রিনশট আপলোড করুন।');
+    await addDoc(collection(db, 'workerPayments'), {
+      workerId,
+      workerName: workerName || '',
+      amount: numericAmount,
+      note: note || '',
+      screenshot,
+      createdAt: serverTimestamp(),
+    });
+  };
+
   // --- MULTI-ITEM CART (variant-aware: same product with different size/color = separate line) ---
   const handleAddToCart = (product, variant = {}) => {
     const { selectedSize, selectedColor } = variant;
@@ -2863,6 +3132,8 @@ export default function App() {
         handleUpdateWorkerSettings={handleUpdateWorkerSettings}
         withdrawalRequests={withdrawalRequests}
         handleProcessWithdrawal={handleProcessWithdrawal}
+        workerPayments={workerPayments}
+        handleAddWorkerPayment={handleAddWorkerPayment}
       />
     );
   }
@@ -2911,6 +3182,7 @@ export default function App() {
         handleDeleteWorkerProduct={handleDeleteWorkerProduct}
         myWithdrawalRequests={withdrawalRequests}
         handleRequestWithdrawal={handleRequestWithdrawal}
+        myPayments={workerPayments}
       />
     );
   }
@@ -3196,21 +3468,6 @@ export default function App() {
               )}
               <span className="text-xs mt-0.5">কার্ট</span>
             </div>
-            {/* কর্মী/অ্যাডমিন প্রবেশ — sticky হেডারে থাকায় পণ্য যতই বাড়ুক, স্ক্রল না করেই সবসময় হাতের কাছে থাকবে */}
-            <div className="relative">
-              <div onClick={() => setStaffMenuOpen((v) => !v)} className="flex flex-col items-center cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
-                <Lock className="h-5 w-5" />
-                <span className="text-xs mt-0.5">স্টাফ</span>
-              </div>
-              {staffMenuOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white text-gray-800 rounded-lg shadow-lg overflow-hidden z-50 text-sm animate-scale-in origin-top-right">
-                  <button onClick={() => { setStaffMenuOpen(false); setCurrentView('worker'); }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-red-50 transition-colors">কর্মী লগইন</button>
-                  <button onClick={() => { setStaffMenuOpen(false); setCurrentView('admin'); }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-red-50 border-t border-gray-100 transition-colors">অ্যাডমিন প্যানেল</button>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </header>
@@ -3279,19 +3536,6 @@ export default function App() {
                 <span className="text-lg">{c.emoji}</span> {c.name}
               </button>
             ))}
-          </div>
-
-          {/* কর্মী/অ্যাডমিন প্রবেশ */}
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">স্টাফ</p>
-          <div className="space-y-1">
-            <button onClick={() => { setMobileNavOpen(false); setCurrentView('worker'); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Lock className="h-4 w-4" /> কর্মী লগইন
-            </button>
-            <button onClick={() => { setMobileNavOpen(false); setCurrentView('admin'); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Lock className="h-4 w-4" /> অ্যাডমিন প্যানেল
-            </button>
           </div>
         </div>
       </div>
@@ -3662,7 +3906,7 @@ export default function App() {
 
           {/* Footer */}
           <footer className="bg-slate-950 text-slate-300">
-            <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-4 gap-8">
+            <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-3 gap-8">
               <div className="md:col-span-2">
                 <div className="flex items-center gap-2 font-display text-xl font-extrabold text-white">
                   <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
@@ -3677,13 +3921,6 @@ export default function App() {
                   <button onClick={scrollToProducts} className="block hover:text-white">পণ্য</button>
                   <button onClick={scrollToHowItWorks} className="block hover:text-white">কীভাবে কাজ করে</button>
                   <button onClick={goToOrders} className="block hover:text-white">অর্ডার ট্র্যাক</button>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-3">স্টাফ</h3>
-                <div className="space-y-2 text-sm">
-                  <button onClick={() => setCurrentView('worker')} className="block hover:text-white">কর্মী লগইন</button>
-                  <button onClick={() => setCurrentView('admin')} className="block hover:text-white">অ্যাডমিন প্যানেল</button>
                 </div>
               </div>
             </div>
