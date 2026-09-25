@@ -13,7 +13,7 @@ import {
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
   Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
   Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award,
-  Copy, Check, MessageCircle
+  Copy, Check, MessageCircle, Facebook, Instagram
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
@@ -2610,6 +2610,62 @@ function FAQChatbot() {
   );
 }
 
+function AboutSection() {
+  return (
+    <section className="bg-white py-16 lg:py-24 border-t border-gray-100 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-1/2 h-full bg-slate-50/50 -skew-x-12 transform origin-top hidden lg:block" />
+      <div className="max-w-6xl mx-auto px-4 relative z-10">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-red-50 border border-red-100 px-3 py-1.5 text-xs font-bold text-red-700 mb-6 shadow-sm">
+              <Award className="h-4 w-4" /> আমাদের গল্প
+            </div>
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-6 leading-tight tracking-tight">
+              চট্টগ্রাম থেকে শুরু হওয়া একটি <span className="text-red-600">আস্থার নাম</span>
+            </h2>
+            <div className="space-y-4 text-gray-600 text-sm md:text-base leading-relaxed">
+              <p>
+                <strong>DrutoLink</strong> এর যাত্রা শুরু হয়েছিল বন্দরনগরী চট্টগ্রাম থেকে, যখন একজন তরুণ উদ্যোক্তা <strong>Mahmud Mahir</strong> স্বপ্ন দেখেছিলেন বাংলাদেশ ও চীনের মধ্যে পণ্য আমদানির জটিলতা দূর করার। সোর্সিং থেকে শুরু করে শিপিং—পুরো প্রক্রিয়াটি সাধারণ মানুষের কাছে সহজলভ্য করাই ছিল তার মূল লক্ষ্য।
+              </p>
+              <p>
+                শুরুতে ছোট একটি পরিসরে কাজ শুরু হলেও, নিরলস পরিশ্রম, সততা এবং গ্রাহকদের অকৃত্রিম আস্থার কারণে DrutoLink আজ দেশের অন্যতম নির্ভরযোগ্য একটি ই-কমার্স ও লজিস্টিকস প্ল্যাটফর্মে পরিণত হয়েছে। আমাদের নিজস্ব ওয়্যারহাউস, দক্ষ প্রসেসিং টিম এবং দ্রুততম ডেলিভারি সিস্টেম নিশ্চিত করে যে, আপনার শখের পণ্যটি নিরাপদে আপনার হাতে পৌঁছাবে।
+              </p>
+              <p>
+                আমরা শুধু পণ্য ডেলিভারি করি না, আমরা স্বপ্ন এবং আস্থা ডেলিভারি করি। আমাদের লক্ষ্য হচ্ছে আগামীতে বাংলাদেশের প্রতিটি প্রান্তে বিশ্বমানের ই-কমার্স সুবিধা পৌঁছে দেওয়া।
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-6 mt-8 pt-8 border-t border-gray-100">
+              <div>
+                <p className="text-4xl font-extrabold text-gray-900 font-display">১০০%</p>
+                <p className="text-sm font-semibold text-gray-500 mt-1">কাস্টমার স্যাটিসফ্যাকশন</p>
+              </div>
+              <div>
+                <p className="text-4xl font-extrabold text-red-600 font-display">৬৪+</p>
+                <p className="text-sm font-semibold text-gray-500 mt-1">জেলায় ডেলিভারি কভারেজ</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="relative">
+            <div className="absolute inset-0 bg-red-600 rounded-[2rem] transform rotate-3 scale-105 opacity-5" />
+            <div className="grid grid-cols-2 gap-4 relative">
+              <div className="space-y-4 pt-8">
+                <img src={slide1Asset} alt="Founder and Factory" className="w-full h-48 md:h-64 object-cover rounded-2xl shadow-lg ring-1 ring-black/5 hover:scale-[1.02] transition-transform duration-300" />
+                <img src={slide3Asset} alt="Processing" className="w-full h-32 md:h-48 object-cover rounded-2xl shadow-lg ring-1 ring-black/5 hover:scale-[1.02] transition-transform duration-300" />
+              </div>
+              <div className="space-y-4 pb-8">
+                <img src={slide2Asset} alt="Warehouse" className="w-full h-32 md:h-48 object-cover rounded-2xl shadow-lg ring-1 ring-black/5 hover:scale-[1.02] transition-transform duration-300" />
+                <img src={slide4Asset} alt="Delivery" className="w-full h-48 md:h-64 object-cover rounded-2xl shadow-lg ring-1 ring-black/5 hover:scale-[1.02] transition-transform duration-300" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // --- MAIN STOREFRONT & PASSWORD GATE COMPONENT ---
 export default function App() {
   // অ্যাডমিন/ওয়ার্কার প্যানেলে সরাসরি ঢোকার একমাত্র পথ এখন URL —
@@ -4203,6 +4259,8 @@ export default function App() {
             )}
           </section>
 
+          <AboutSection />
+
           {/* Footer */}
           <footer className="bg-slate-950 text-slate-300">
             <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-3 gap-8">
@@ -4212,6 +4270,14 @@ export default function App() {
                   Druto<span className="font-medium text-slate-300">Link</span>
                 </div>
                 <p className="text-sm leading-6 text-slate-400 max-w-md mt-4">চীন থেকে পণ্য সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির জন্য একটি সহজ ও আধুনিক প্ল্যাটফর্ম।</p>
+                <div className="flex gap-4 mt-6">
+                  <a href="https://www.facebook.com/profile.php?id=61594579977315" target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-800/80 rounded-full hover:bg-blue-600 hover:text-white transition-all text-slate-300">
+                    <Facebook className="h-5 w-5" />
+                  </a>
+                  <a href="https://www.instagram.com/drutolink/" target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-800/80 rounded-full hover:bg-pink-600 hover:text-white transition-all text-slate-300">
+                    <Instagram className="h-5 w-5" />
+                  </a>
+                </div>
               </div>
               <div>
                 <h3 className="font-bold text-white mb-3">দ্রুত লিংক</h3>
