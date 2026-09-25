@@ -11,7 +11,7 @@ import {
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
   Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
   Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award,
-  Copy, Check
+  Copy, Check, MessageCircle
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
@@ -572,7 +572,10 @@ function ProductDetailModal({ product, allProducts = [], onClose, onAddToCart, o
             <div className="bg-gray-50 rounded-lg p-4 text-sm border border-gray-200">
                <div className="flex justify-between py-1.5 border-b border-gray-200"><span className="text-gray-500 font-medium">Product Quantity</span><span className="font-bold text-gray-800">{quantity} <span className="text-[10px] text-gray-400 font-normal ml-1">Minimum Quantity: 1</span></span></div>
                <div className="flex justify-between py-1.5 border-b border-gray-200"><span className="text-gray-500 font-medium">Product Price</span><span className="font-bold text-red-600">৳ {Number(product.price) * quantity}</span></div>
-               <div className="flex justify-between py-1.5"><span className="text-gray-500 font-medium">Shipping Charge</span><span className="font-bold text-gray-800">৳ 790 / 1170 Per Kg ++ <span className="text-[10px] text-gray-400 font-normal ml-1">(Min weight charge 500 grams)</span></span></div>
+               <div className="flex justify-between py-1.5"><span className="text-gray-500 font-medium">Shipping Charge</span><span className="font-bold text-gray-800">৳ 900 Per Kg <span className="text-[10px] text-gray-400 font-normal ml-1">(আনুমানিক)</span></span></div>
+               <div className="mt-3 text-[11px] text-red-600 bg-red-50/80 p-2.5 rounded-lg border border-red-100 leading-tight">
+                 <strong>বিঃদ্রঃ</strong> শিপিং চার্জ ৯০০ টাকা প্রতি কেজি, কিন্তু ওয়েবসাইটে প্রোডাক্টে যা শো করে তা ১০০% একুরেট না। প্রোডাক্ট দেশে আসার পর আসল ওজন মেপে চূড়ান্ত শিপিং চার্জ ধরা হবে।
+               </div>
             </div>
           </div>
 
@@ -2511,6 +2514,93 @@ function CopyableNumber({ number }) {
   );
 }
 
+const FAQ_LIST = [
+  { q: "আপনারা কিভাবে কাজ করেন?", a: "আমরা মূলত চায়না থেকে আপনার পছন্দের পণ্য সোর্সিং করে বাংলাদেশে ডেলিভারি দিয়ে থাকি।" },
+  { q: "ডেলিভারি সময় কতদিন?", a: "ডেলিভারি টাইম সাধারণত ১৫-২০ দিনের কম সময়ে চলে আসে, তবে সেফটি পারপাসে একটু বেশি সময় নেওয়া হয়।" },
+  { q: "শিপিং চার্জ কত?", a: "চায়না থেকে বাংলাদেশে বাসা পর্যন্ত ডেলিভারী এবং শিপিং চার্জ ৯০০ টাকা প্রতি কেজি। তবে এই চার্জটি অনুমানিক, একুরেট না। প্রোডাক্ট দেশে আসার পর আসল ওজন মেপে একুরেট চার্জ ধরা হয়।" },
+  { q: "সী শিপমেন্ট কি চালু আছে?", a: "আমাদের সী শিপমেন্ট এখন চালু নেই, তবে বাল্ক অর্ডারে (বেশি পরিমাণে) আমরা এটি চালু করবো।" },
+  { q: "এডভান্স পেমেন্ট করতে হবে কি?", a: "হ্যাঁ, অর্ডার কনফার্ম করতে অন্তত ৫০% এডভান্স পেমেন্ট প্রযোজ্য।" },
+  { q: "প্রোডাক্ট রিটার্ন পলিসি কি?", a: "সোর্সিং প্রোডাক্ট হওয়ায় সাধারণত রিটার্ন হয় না, তবে ভাঙা বা ভুল প্রোডাক্ট পেলে আমরা ক্ষতিপূরণ দিয়ে থাকি।" },
+  { q: "কাস্টমাইজড প্রোডাক্ট আনা যাবে?", a: "হ্যাঁ, আপনার চাহিদা অনুযায়ী চায়না থেকে কাস্টমাইজড প্রোডাক্ট আনা সম্ভব।" },
+  { q: "অর্ডার ট্র্যাক করব কিভাবে?", a: "লগ ইন করে 'আমার অর্ডার' সেকশন থেকে আপনার অর্ডারের বর্তমান স্ট্যাটাস দেখতে পারবেন।" },
+  { q: "মিনিমাম অর্ডার কোয়ান্টিটি (MOQ) কত?", a: "প্রোডাক্ট অনুযায়ী MOQ ভিন্ন হয়, তবে সাধারণত ১ পিসও আনা যায়। হোলসেলের জন্য বেশি নিতে হয়।" },
+  { q: "যোগাযোগের উপায় কি?", a: "আপনি আমাদের হটলাইন নম্বরে অথবা ফেসবুক পেজে মেসেজ দিয়ে যোগাযোগ করতে পারেন।" }
+];
+
+function FAQChatbot() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    { type: 'bot', text: 'হ্যালো! DrutoLink-এ আপনাকে স্বাগতম। আপনার কি জানার আছে?' }
+  ]);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen]);
+
+  const handleQuestionClick = (faq) => {
+    setMessages(prev => [
+      ...prev,
+      { type: 'user', text: faq.q },
+      { type: 'bot', text: faq.a }
+    ]);
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 font-body">
+      {isOpen ? (
+        <div className="bg-white rounded-2xl shadow-2xl w-[320px] sm:w-[350px] border border-gray-100 flex flex-col h-[450px] overflow-hidden animate-scale-in origin-bottom-right">
+          <div className="bg-red-600 text-white p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              <h3 className="font-bold text-sm">সাধারণ প্রশ্নোত্তর (FAQ)</h3>
+            </div>
+            <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white transition-colors">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 thin-scroll bg-slate-50">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.type === 'user' ? 'bg-red-600 text-white rounded-br-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm shadow-sm'}`}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="bg-white border-t border-gray-100 p-3 h-[140px] overflow-y-auto thin-scroll">
+            <p className="text-[11px] text-gray-500 font-medium mb-2 uppercase">নিচের প্রশ্নগুলোতে ক্লিক করুন:</p>
+            <div className="flex flex-wrap gap-2">
+              {FAQ_LIST.map((faq, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleQuestionClick(faq)}
+                  className="text-left text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition-colors border border-gray-200"
+                >
+                  {faq.q}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-xl hover:shadow-red-600/30 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+        >
+          <MessageCircle className="h-6 w-6" />
+          <span className="font-bold hidden md:inline pr-1">জিজ্ঞাসা?</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 // --- MAIN STOREFRONT & PASSWORD GATE COMPONENT ---
 export default function App() {
   // অ্যাডমিন/ওয়ার্কার প্যানেলে সরাসরি ঢোকার একমাত্র পথ এখন URL —
@@ -4128,6 +4218,7 @@ export default function App() {
           </footer>
         </>
       )}
+      {currentView !== 'admin' && currentView !== 'worker' && <FAQChatbot />}
     </div>
   );
 }
