@@ -585,34 +585,141 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
 }
 
 // --- ORDER STATUS TIMELINE ---
+const AnimatedTrackingViz = ({ status }) => {
+  const getScene = () => {
+    switch(status) {
+      case 'Payment Pending':
+      case 'Pending TrxID':
+        return (
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <motion.div animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="text-red-500">
+              <Wallet size={64} />
+            </motion.div>
+            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+              <p className="text-gray-500 font-bold font-display text-center">পেমেন্ট কনফার্মেশনের অপেক্ষায়...</p>
+            </motion.div>
+          </div>
+        );
+      case 'Order Placed':
+      case 'Processing':
+        return (
+          <div className="flex flex-col items-center justify-center h-full space-y-4 relative">
+            <motion.div animate={{ y: [0, -15, 0] }} transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }} className="text-blue-500 z-10">
+              <Package size={64} />
+            </motion.div>
+            <motion.div animate={{ scaleX: [1, 0.8, 1], opacity: [0.3, 0.1, 0.3] }} transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }} className="w-16 h-4 bg-gray-400 rounded-[50%] absolute bottom-1/4" />
+            <p className="text-gray-500 font-bold font-display mt-4 text-center">আপনার অর্ডার প্রসেসিং হচ্ছে...</p>
+          </div>
+        );
+      case 'Sourced in China':
+        return (
+          <div className="flex flex-col items-center justify-center h-full relative">
+            <motion.div initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex items-center space-x-2 text-indigo-600">
+              <MapPin size={48} />
+              <Package size={48} />
+            </motion.div>
+            <p className="text-gray-500 font-bold font-display mt-4 text-center">চীনে পণ্য সোর্স করা হয়েছে!</p>
+          </div>
+        );
+      case 'In Transit':
+        return (
+          <div className="w-full h-full relative overflow-hidden bg-sky-100 flex items-center justify-center">
+            <motion.div animate={{ x: ['100%', '-100%'] }} transition={{ repeat: Infinity, duration: 10, ease: "linear" }} className="absolute top-4 w-12 h-6 bg-white rounded-full opacity-70 blur-[1px]" />
+            <motion.div animate={{ x: ['100%', '-100%'] }} transition={{ repeat: Infinity, duration: 15, ease: "linear", delay: 2 }} className="absolute top-10 w-16 h-8 bg-white rounded-full opacity-60 blur-[1px]" />
+            <motion.div animate={{ x: [-100, 100], y: [-5, 5, -5] }} transition={{ x: { repeat: Infinity, duration: 3, ease: "linear" }, y: { repeat: Infinity, duration: 2, ease: "easeInOut" } }} className="text-slate-700 z-10">
+              <Plane size={64} />
+            </motion.div>
+            <p className="absolute bottom-4 text-sky-800 font-bold font-display">বাংলাদেশে আসার পথে...</p>
+          </div>
+        );
+      case 'Arrived in Bangladesh':
+        return (
+          <div className="flex flex-col items-center justify-center h-full relative">
+             <motion.div animate={{ y: [-10, 0], scale: [1.2, 1] }} transition={{ type: "spring", stiffness: 200 }} className="text-green-600">
+              <MapPin size={64} />
+            </motion.div>
+            <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.5 }} className="mt-2 text-orange-500">
+              <Package size={48} />
+            </motion.div>
+            <p className="text-gray-500 font-bold font-display mt-4 text-center">বাংলাদেশে এসে পৌঁছেছে!</p>
+          </div>
+        );
+      case 'Out for Delivery':
+        return (
+          <div className="w-full h-full relative overflow-hidden bg-gray-50 flex items-center justify-center">
+            <div className="absolute bottom-1/4 w-full h-1 bg-gray-300"></div>
+            <motion.div animate={{ x: ['-50vw', '50vw'] }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }} className="text-red-600 z-10 absolute bottom-1/4 pb-1 flex items-end">
+              <Truck size={64} />
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.5, ease: "linear" }} className="w-4 h-4 rounded-full border-2 border-slate-800 absolute bottom-1 left-2" />
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.5, ease: "linear" }} className="w-4 h-4 rounded-full border-2 border-slate-800 absolute bottom-1 right-2" />
+            </motion.div>
+            <p className="absolute bottom-4 text-red-600 font-bold font-display text-center">আপনার ঠিকানায় ডেলিভারির পথে!</p>
+          </div>
+        );
+      case 'Delivered':
+        return (
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: [0, 1.2, 1], rotate: [0, 10, -10, 0] }} transition={{ type: "spring", stiffness: 150, duration: 0.8 }} className="text-green-500 relative">
+              <Package size={80} />
+              <motion.div initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.5 }} className="absolute -top-2 -right-2 bg-white rounded-full text-green-600">
+                <CheckCircle size={32} />
+              </motion.div>
+            </motion.div>
+            <motion.p animate={{ opacity: [0, 1] }} transition={{ delay: 0.8 }} className="text-green-600 font-bold font-display text-xl text-center">
+              সফলভাবে ডেলিভারি হয়েছে!
+            </motion.p>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+             <Package size={64} />
+             <p className="font-bold mt-2 text-center">অপেক্ষা করুন...</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="w-full h-48 sm:h-56 bg-white border border-gray-100 rounded-2xl mb-8 overflow-hidden relative shadow-sm">
+      {getScene()}
+    </div>
+  );
+};
+
 function OrderStatusTimeline({ status }) {
   const stageIndex = ORDER_STAGES.indexOf(status);
   const currentIndex = Math.max(0, stageIndex === -1 ? 0 : stageIndex);
   return (
-    <div className="flex items-center w-full">
-      {ORDER_STAGES.map((stage, i) => {
-        const done = i < currentIndex;
-        const active = i === currentIndex;
-        return (
-          <React.Fragment key={stage}>
-            <div className="flex flex-col items-center text-center w-20">
-              <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors duration-300 ${
-                done ? 'bg-red-600 border-red-600 text-white'
-                : active ? 'border-red-600 text-red-600 bg-red-50 ring-4 ring-red-50'
-                : 'border-gray-300 text-gray-300 bg-white'
-              }`}>
-                {done ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-3 w-3 fill-current" />}
-              </div>
-              <span className={`mt-1.5 text-[10px] leading-tight ${active ? 'text-red-700 font-bold' : done ? 'text-gray-700' : 'text-gray-400'}`}>
-                {stage}
-              </span>
-            </div>
-            {i < ORDER_STAGES.length - 1 && (
-              <div className={`flex-1 h-0.5 -mt-5 transition-colors duration-500 ${i < currentIndex ? 'bg-red-600' : 'bg-gray-200'}`} />
-            )}
-          </React.Fragment>
-        );
-      })}
+    <div className="w-full">
+      <AnimatedTrackingViz status={status} />
+      <div className="overflow-x-auto pb-4 thin-scroll">
+        <div className="min-w-[720px] flex items-center w-full px-2">
+          {ORDER_STAGES.map((stage, i) => {
+            const done = i < currentIndex;
+            const active = i === currentIndex;
+            return (
+              <React.Fragment key={stage}>
+                <div className="flex flex-col items-center text-center w-24 shrink-0 relative">
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300 z-10 ${
+                    done ? 'bg-red-600 border-red-600 text-white shadow-md'
+                    : active ? 'border-red-600 text-red-600 bg-red-50 ring-4 ring-red-100 shadow-md scale-110'
+                    : 'border-gray-200 text-gray-300 bg-white'
+                  }`}>
+                    {done ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-3 w-3 fill-current" />}
+                  </div>
+                  <span className={`mt-2 text-[10px] leading-tight ${active ? 'text-red-700 font-bold' : done ? 'text-gray-700' : 'text-gray-400'}`}>
+                    {stage}
+                  </span>
+                </div>
+                {i < ORDER_STAGES.length - 1 && (
+                  <div className={`flex-1 h-[2px] -mt-5 transition-colors duration-500 z-0 ${i < currentIndex ? 'bg-red-600' : 'bg-gray-100'}`} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3295,7 +3402,7 @@ export default function App() {
                       <p className="text-xl font-bold text-red-700">৳ {Number(o.totalPrice || 0).toLocaleString('en-BD')}</p>
                     </div>
                   </div>
-                  <div className="overflow-x-auto pb-2"><div className="min-w-[720px]"><OrderStatusTimeline status={o.status} /></div></div>
+                  <OrderStatusTimeline status={o.status} />
                   <div className="grid md:grid-cols-3 gap-3 mt-6">
                     <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs text-gray-500">আনুমানিক ওজন</p><p className="font-bold mt-1">{Number(o.estimatedWeightKg || 0).toFixed(2)} KG</p></div>
                     <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs text-gray-500">Shipping</p><p className="font-bold mt-1">৳ {Number(o.finalShippingCharge ?? o.estimatedShippingCharge ?? 0).toLocaleString('en-BD')}</p></div>
