@@ -1494,6 +1494,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
               {orders.length === 0 ? (
                 <p className="text-gray-500 text-sm">এখনো কোনো অর্ডার আসেনি।</p>
               ) : (
+                <React.Fragment>
                 <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
