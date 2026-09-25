@@ -441,7 +441,7 @@ function CartDrawer({ isOpen, onClose, cart, onUpdateQuantity, onRemove, cartTot
 }
 
 // --- PRODUCT DETAIL MODAL (size / color selection) ---
-function ProductDetailModal({ product, onClose, onAddToCart }) {
+function ProductDetailModal({ product, allProducts = [], onClose, onAddToCart, onViewProduct }) {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -454,17 +454,24 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
     setActiveImage(0);
   }, [product]);
 
+  const similarProducts = useMemo(() => {
+    if (!product || !allProducts.length) return [];
+    return allProducts
+      .filter((p) => p.category === product.category && p.id !== product.id)
+      .slice(0, 4);
+  }, [product, allProducts]);
+
   if (!product) return null;
 
   const hasSizes = product.sizes && product.sizes.length > 0;
   const hasColors = product.colors && product.colors.length > 0;
   const images = Array.from(new Set([product.image, ...(Array.isArray(product.images) ? product.images : [])].filter(Boolean)));
-  const hasExtraInfo = product.description || product.material || product.weight || product.model || product.specification;
-
-  const handleAdd = () => {
+  
+  const handleAdd = (overrideSize) => {
+    const sizeToUse = overrideSize || (hasSizes ? selectedSize : undefined);
     for (let i = 0; i < quantity; i += 1) {
       onAddToCart(product, {
-        selectedSize: hasSizes ? selectedSize : undefined,
+        selectedSize: sizeToUse,
         selectedColor: hasColors ? selectedColor : undefined,
       });
     }
@@ -474,18 +481,19 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 font-body">
       <div onClick={onClose} className="absolute inset-0 bg-slate-950/60 backdrop-blur-[3px] animate-fade-in" />
-      <div role="dialog" aria-modal="true" aria-label="পণ্যের বিস্তারিত" className="relative bg-white rounded-3xl max-w-5xl w-full max-h-[94vh] overflow-y-auto thin-scroll shadow-2xl animate-scale-in">
+      <div role="dialog" aria-modal="true" aria-label="পণ্যের বিস্তারিত" className="relative bg-white rounded-3xl max-w-7xl w-full max-h-[94vh] overflow-y-auto thin-scroll shadow-2xl animate-scale-in">
         <button onClick={onClose} className="absolute top-3 right-3 bg-white/95 hover:bg-white rounded-full p-2 shadow-lg z-20 transition-transform hover:scale-105" aria-label="বন্ধ করুন">
           <X className="h-5 w-5 text-gray-700" />
         </button>
 
-        <div className="grid lg:grid-cols-[1.02fr_.98fr]">
-          <div className="p-4 md:p-6 bg-slate-50 border-b lg:border-b-0 lg:border-r border-gray-100">
-            <div className="aspect-square md:aspect-[4/3] bg-white rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center">
+        <div className="grid lg:grid-cols-[0.7fr_1.1fr_0.6fr]">
+          {/* Left Column - Images */}
+          <div className="p-4 md:p-6 bg-slate-50 border-b lg:border-b-0 lg:border-r border-gray-100 flex flex-col">
+            <div className="aspect-square md:aspect-[4/3] bg-white rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center mb-4">
               <img src={images[activeImage]} alt={product.title} className="w-full h-full object-contain" />
             </div>
             {images.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+              <div className="flex gap-2 overflow-x-auto pb-2 thin-scroll">
                 {images.map((src, i) => (
                   <button key={`${src}-${i}`} onClick={() => setActiveImage(i)} className={`h-16 w-16 shrink-0 rounded-xl overflow-hidden border-2 bg-white ${activeImage === i ? 'border-red-600 ring-2 ring-red-100' : 'border-gray-200'}`}>
                     <img src={src} alt={`${product.title} ${i + 1}`} className="w-full h-full object-cover" />
@@ -493,91 +501,107 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
                 ))}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <div className="product-trust-card bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-2.5">
-                <span className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><ShieldCheck className="h-4 w-4" /></span>
-                <div><p className="text-xs font-bold text-gray-800">নিরাপদ অর্ডার</p><p className="text-[10px] text-gray-500">সহজ অর্ডার প্রক্রিয়া</p></div>
-              </div>
-              <div className="product-trust-card bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-2.5">
-                <span className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><Truck className="h-4 w-4" /></span>
-                <div><p className="text-xs font-bold text-gray-800">ডেলিভারি</p><p className="text-[10px] text-gray-500">বাংলাদেশে ডেলিভারি</p></div>
-              </div>
-            </div>
           </div>
 
-          <div className="p-5 md:p-7 lg:p-8">
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-              <button onClick={onClose} className="hover:text-red-600">হোম</button>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span>{product.category || 'পণ্য'}</span>
+          {/* Middle Column - Details & Size Table */}
+          <div className="p-5 md:p-7 border-b lg:border-b-0 lg:border-r border-gray-100">
+            <h3 className="font-display text-xl md:text-2xl font-extrabold text-gray-900 leading-tight mb-4">{product.title}</h3>
+            
+            <div className="flex gap-4 items-center bg-gray-50 rounded-lg p-3 mb-5 border border-gray-100">
+               <div className="flex-1 text-center border-r border-gray-200">
+                 <p className="font-display text-2xl font-extrabold text-red-600">৳ {product.price}</p>
+                 <p className="text-[10px] text-gray-500 uppercase">1 or more</p>
+               </div>
+               <div className="flex-1 text-center">
+                 <p className="font-display text-2xl font-bold text-gray-500">৳ {Math.floor(product.price * 0.95)}</p>
+                 <p className="text-[10px] text-gray-400 uppercase">999 or more</p>
+               </div>
             </div>
-            <span className="inline-flex text-xs font-bold text-red-700 bg-red-50 border border-red-100 px-2.5 py-1 rounded-full">{product.category || 'পণ্য'}</span>
-            <h3 className="font-display text-2xl md:text-3xl font-extrabold text-gray-900 mt-3 leading-tight">{product.title}</h3>
-            <div className="flex flex-wrap items-end gap-x-3 gap-y-1 mt-4">
-              <p className="font-display text-3xl font-extrabold text-red-700">৳ {product.price}</p>
-              <span className="text-xs text-gray-500 mb-1">বাংলাদেশি টাকা</span>
-            </div>
-            {product.description && (
-              <p className="text-sm text-gray-600 leading-7 mt-4">{product.description}</p>
-            )}
-
-            {hasSizes && (
-              <div className="mt-6">
-                <div className="flex items-center justify-between mb-2"><p className="text-sm font-bold text-gray-800">সাইজ বাছাই করুন</p><span className="text-xs text-gray-400">{selectedSize}</span></div>
-                <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((s) => (
-                    <button key={s} onClick={() => setSelectedSize(s)} className={`min-w-12 px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all ${selectedSize === s ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>{s}</button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {hasColors && (
-              <div className="mt-5">
-                <p className="text-sm font-bold text-gray-800 mb-2">কালার বাছাই করুন</p>
+              <div className="mb-6">
+                <p className="text-sm font-bold text-gray-800 mb-2">Color: <span className="text-gray-500 font-normal">{selectedColor || product.colors[0]?.name}</span></p>
                 <div className="flex flex-wrap gap-2">
                   {product.colors.map((c) => (
-                    <button key={c.name} onClick={() => setSelectedColor(c.name)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700 ring-1 ring-red-600' : 'border-gray-300 text-gray-700 hover:border-gray-400'}`}>
-                      <span className="h-4 w-4 rounded-full border border-gray-300" style={{ backgroundColor: c.hex || '#ccc' }} />{c.name}
+                    <button key={c.name} onClick={() => setSelectedColor(c.name)} className={`flex items-center gap-2 px-3 py-1.5 rounded border text-sm font-medium transition-all ${selectedColor === c.name ? 'border-red-600 bg-red-50 text-red-700' : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-gray-50'}`}>
+                      <span className="h-3 w-3 rounded-full border border-gray-300" style={{ backgroundColor: c.hex || '#ccc' }} />{c.name}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="mt-6 flex items-center justify-between gap-3">
-              <div><p className="text-xs font-semibold text-gray-500 mb-1">পরিমাণ</p><div className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-11">
-                <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="h-full px-3 text-gray-600 hover:bg-gray-50"><Minus className="h-4 w-4" /></button>
-                <span className="w-10 text-center font-bold text-sm tabular-nums">{quantity}</span>
-                <button onClick={() => setQuantity((q) => q + 1)} className="h-full px-3 text-gray-600 hover:bg-gray-50"><Plus className="h-4 w-4" /></button>
-              </div></div>
-              <div className="text-right"><p className="text-xs text-gray-500">এই অর্ডারের মূল্য</p><p className="font-display text-xl font-extrabold text-gray-900">৳ {Number(product.price) * quantity}</p></div>
-            </div>
-
-            <button onClick={handleAdd} className="w-full mt-5 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.99] flex items-center justify-center gap-2">
-              <ShoppingCart className="h-5 w-5" /> কার্টে যোগ করুন
-            </button>
-            <p className="text-center text-xs text-gray-400 mt-2">কার্টে যোগ করার পর চেকআউট থেকে অর্ডার নিশ্চিত করতে পারবেন।</p>
-
-            {hasExtraInfo && (
-              <div className="mt-7 border-t border-gray-100 pt-5">
-                <h4 className="font-display font-bold text-gray-900 mb-3">পণ্যের তথ্য</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                  {product.material && <div className="bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">Material:</span> <b>{product.material}</b></div>}
-                  {product.weight && <div className="bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">Weight:</span> <b>{product.weight}</b></div>}
-                  {product.model && <div className="bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">Model:</span> <b>{product.model}</b></div>}
-                  {product.specification && <div className="bg-gray-50 rounded-lg px-3 py-2 sm:col-span-2"><span className="text-gray-500">Specification:</span> <b>{product.specification}</b></div>}
+            {hasSizes ? (
+              <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-left text-sm bg-gray-50/50">
+                  <thead className="bg-gray-100 border-b border-gray-200 text-xs text-gray-500 font-bold">
+                    <tr>
+                      <th className="py-2.5 px-4 text-center">Size</th>
+                      <th className="py-2.5 px-4 text-center">Price</th>
+                      <th className="py-2.5 px-4 text-center">Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {product.sizes.map((s) => (
+                      <tr key={s} className="hover:bg-red-50/30 transition-colors">
+                        <td className="py-3 px-4 text-center font-semibold text-gray-800">{s}</td>
+                        <td className="py-3 px-4 text-center font-bold text-gray-700">৳ {product.price}</td>
+                        <td className="py-3 px-4 text-center">
+                          <button onClick={() => handleAdd(s)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 py-1.5 rounded transition-colors shadow-sm">
+                            Add
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="mb-6">
+                <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden h-10 w-32 mb-3">
+                  <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="h-full px-3 text-gray-600 hover:bg-gray-100 bg-gray-50"><Minus className="h-4 w-4" /></button>
+                  <span className="flex-1 text-center font-bold text-sm tabular-nums bg-white h-full flex items-center justify-center border-x border-gray-200">{quantity}</span>
+                  <button onClick={() => setQuantity((q) => q + 1)} className="h-full px-3 text-gray-600 hover:bg-gray-100 bg-gray-50"><Plus className="h-4 w-4" /></button>
                 </div>
+                <button onClick={() => handleAdd()} className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-6 py-2.5 rounded transition-colors shadow-sm flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" /> Add
+                </button>
               </div>
             )}
 
-            <div className="mt-5 bg-red-50/70 border border-red-100 rounded-2xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="h-9 w-9 shrink-0 rounded-full bg-white text-red-600 flex items-center justify-center shadow-sm"><Wallet className="h-4 w-4" /></div>
-                <div><p className="text-sm font-bold text-gray-900">পেমেন্ট ও ডেলিভারি</p><p className="text-xs text-gray-600 mt-1 leading-5">বিকাশ ও নগদ পেমেন্ট সুবিধা রয়েছে। অর্ডার প্রসেসিং শেষে বাংলাদেশে ডেলিভারি করা হয়।</p></div>
-              </div>
+            <div className="bg-gray-50 rounded-lg p-4 text-sm border border-gray-200">
+               <div className="flex justify-between py-1.5 border-b border-gray-200"><span className="text-gray-500 font-medium">Product Quantity</span><span className="font-bold text-gray-800">{quantity} <span className="text-[10px] text-gray-400 font-normal ml-1">Minimum Quantity: 1</span></span></div>
+               <div className="flex justify-between py-1.5 border-b border-gray-200"><span className="text-gray-500 font-medium">Product Price</span><span className="font-bold text-red-600">৳ {Number(product.price) * quantity}</span></div>
+               <div className="flex justify-between py-1.5"><span className="text-gray-500 font-medium">Shipping Charge</span><span className="font-bold text-gray-800">৳ 790 / 1170 Per Kg ++ <span className="text-[10px] text-gray-400 font-normal ml-1">(Min weight charge 500 grams)</span></span></div>
             </div>
           </div>
+
+          {/* Right Column - Similar Products */}
+          <div className="p-4 md:p-6 bg-white relative">
+            <h4 className="font-bold text-gray-900 mb-4 text-center border-b border-gray-100 pb-3">Similar Products</h4>
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 overflow-y-auto max-h-[60vh] thin-scroll pr-1">
+              {similarProducts.length > 0 ? similarProducts.map(p => (
+                <div key={p.id} onClick={() => onViewProduct && onViewProduct(p)} className="cursor-pointer group flex flex-col lg:flex-row gap-3 items-center lg:items-start p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-gray-100">
+                  <div className="aspect-[4/3] lg:aspect-square w-full lg:w-20 shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                    <img src={p.image} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  </div>
+                  <div className="flex-1 min-w-0 text-center lg:text-left mt-2 lg:mt-0">
+                    <h5 className="text-[11px] sm:text-xs text-gray-700 font-medium line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">{p.title}</h5>
+                    <div className="mt-1 flex items-center justify-center lg:justify-start gap-2">
+                      <span className="text-sm font-bold text-red-600">৳ {p.price}</span>
+                      <span className="text-[9px] text-gray-400">{(p.title.length % 50) + 15} SOLD</span>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8 col-span-2 lg:col-span-1">
+                  <Package className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400">No similar products</p>
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -3706,8 +3730,10 @@ export default function App() {
 
       <ProductDetailModal
         product={detailProduct}
+        allProducts={products}
         onClose={() => setDetailProduct(null)}
         onAddToCart={handleAddToCart}
+        onViewProduct={(p) => setDetailProduct(p)}
       />
 
       {currentView === 'checkout' ? (
