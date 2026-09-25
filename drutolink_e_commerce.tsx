@@ -4013,6 +4013,11 @@ export default function App() {
             </div>
           </section>
 
+          {/* Image Slider Section */}
+          <section className="max-w-6xl mx-auto px-4 py-8">
+            <ImageSlider />
+          </section>
+
           {/* Quick service actions */}
           <section className="bg-white border-b border-gray-100">
             <div className="max-w-6xl mx-auto px-4 py-6 md:py-7 grid md:grid-cols-3 gap-3">
