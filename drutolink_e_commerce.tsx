@@ -1171,6 +1171,8 @@ function OverviewTab({ products, orders, workers, withdrawalRequests }) {
 function AdminDashboard({ goHome, handleLogout, products, orders, workers, handleCreateWorker, handleDeleteWorker, handleUpdateWorkerSettings, withdrawalRequests, handleProcessWithdrawal, workerPayments, handleAddWorkerPayment }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false); // মোবাইলে সাইডবার লুকানো/দেখানো নিয়ন্ত্রণ করে
+  const [visibleOrdersCount, setVisibleOrdersCount] = useState(20);
+  const [visibleProductsCount, setVisibleProductsCount] = useState(20);
 
   // --- Worker creation form state ---
   const [workerName, setWorkerName] = useState('');
@@ -1507,7 +1509,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => (
+                    {orders.slice(0, visibleOrdersCount).map((o) => (
                       <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50 align-top">
                         <td className="p-4">
                           <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => toggleOrderSelected(o.id)} className="h-4 w-4" />
@@ -1575,6 +1577,12 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                   </tbody>
                 </table>
                 </div>
+                {visibleOrdersCount < orders.length && (
+                  <div className="mt-4 flex justify-center">
+                    <button onClick={() => setVisibleOrdersCount(prev => prev + 20)} className="bg-gray-100 text-gray-700 hover:bg-gray-200 font-semibold px-4 py-2 rounded text-sm transition-colors">আরও লোড করুন</button>
+                  </div>
+                )}
+              </React.Fragment>
               )}
             </div>
           )}
@@ -1690,8 +1698,9 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                 {products.length === 0 ? (
                   <p className="text-gray-500 text-sm">এখনো কোনো প্রোডাক্ট যোগ করা হয়নি।</p>
                 ) : (
+                  <React.Fragment>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    {products.map((p) => (
+                    {products.slice(0, visibleProductsCount).map((p) => (
                       <div key={p.id} className="border rounded-lg p-4 flex items-center justify-between bg-gray-50">
                         <div className="flex items-center space-x-3">
                           <img src={p.image} alt={p.title} className="h-12 w-12 object-cover rounded" />
@@ -1719,6 +1728,12 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       </div>
                     ))}
                   </div>
+                  {visibleProductsCount < products.length && (
+                    <div className="mt-6 flex justify-center">
+                      <button onClick={() => setVisibleProductsCount(prev => prev + 20)} className="bg-gray-100 text-gray-700 hover:bg-gray-200 font-semibold px-4 py-2 rounded text-sm transition-colors">আরও লোড করুন</button>
+                    </div>
+                  )}
+                  </React.Fragment>
                 )}
               </div>
             </div>
