@@ -304,8 +304,13 @@ function ImageSlider() {
     <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
       <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${active * 100}%)` }}>
         {SLIDES.map((s, i) => (
-          <div key={i} className="min-w-full relative h-48 md:h-72">
-            <img src={s.image} alt={s.alt} className="absolute inset-0 w-full h-full object-cover" />
+          <div key={i} className="min-w-full relative h-64 md:h-96 lg:h-[450px] bg-slate-900 overflow-hidden">
+            {/* Blurred Background for Premium Look */}
+            <div className="absolute inset-0 z-0">
+               <img src={s.image} alt="" className="w-full h-full object-cover blur-2xl opacity-60 scale-110" />
+            </div>
+            {/* Actual Image without cropping */}
+            <img src={s.image} alt={s.alt} className="absolute inset-0 z-10 w-full h-full object-contain drop-shadow-2xl" />
           </div>
         ))}
       </div>
