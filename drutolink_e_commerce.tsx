@@ -3,6 +3,11 @@ import logoAsset from './logo.png';
 import slide1Asset from './slide1.jpg';
 import slide2Asset from './slide2.jpg';
 import slide3Asset from './slide3.jpg';
+import slide4Asset from './slide4.jpg';
+import slide5Asset from './slide5.jpg';
+import slide6Asset from './slide6.jpg';
+import slide7Asset from './slide7.jpg';
+import slide8Asset from './slide8.jpg';
 import promoPopupAsset from './promo-popup.jpg';
 const productPlaceholderAsset = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'>No Image</text></svg>";
 import {
@@ -269,8 +274,13 @@ const CATEGORIES = [
 
 const SLIDES = [
   { image: slide1Asset, alt: 'চায়না টু বাংলাদেশ শিপিং' },
-  { image: slide2Asset, alt: 'চায়না টু বাংলাদেশ শিপিং তথ্য' },
-  { image: slide3Asset, alt: 'সোর্সিং টু শিপিং এক ওয়েবসাইটে' },
+  { image: slide2Asset, alt: 'ওয়্যারহাউজ প্রসেসিং' },
+  { image: slide3Asset, alt: 'পণ্য চেকিং' },
+  { image: slide4Asset, alt: 'সোর্সিং টু শিপিং' },
+  { image: slide5Asset, alt: 'কার্গো বিমান' },
+  { image: slide6Asset, alt: 'শিপমেন্ট কন্টেইনার' },
+  { image: slide7Asset, alt: 'ডেলিভারি ট্র্যাকিং' },
+  { image: slide8Asset, alt: 'দ্রুত ডেলিভারি' },
 ];
 
 // --- IMAGE SLIDER ---
