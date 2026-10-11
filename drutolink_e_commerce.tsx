@@ -17,14 +17,14 @@ import {
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
-import { Link } from './src/Link';
-import { navigate, parsePath, buildPath, applyMeta } from './src/router';
-import { SITE, FAQ_LIST, slugToCategory, categoryPath, pageMeta } from './src/site';
+import { Link } from './Link';
+import { navigate, parsePath, buildPath, applyMeta } from './router';
+import { SITE, FAQ_LIST, slugToCategory, categoryPath, pageMeta } from './site';
 import {
   AboutPage, HowItWorksPage, ShippingPage, ReturnPolicyPage, PrivacyPage, TermsPage,
   ContactPage, FaqPage, NotFoundPage,
-} from './src/pages/StaticPages';
-import { ProductsPage, ProductPage } from './src/pages/StorePages';
+} from './StaticPages';
+import { ProductsPage, ProductPage } from './StorePages';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, limit,
