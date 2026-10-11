@@ -17,6 +17,14 @@ import {
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
+import { Link } from './src/Link';
+import { navigate, parsePath, buildPath, applyMeta } from './src/router';
+import { SITE, FAQ_LIST, slugToCategory, categoryPath, pageMeta } from './src/site';
+import {
+  AboutPage, HowItWorksPage, ShippingPage, ReturnPolicyPage, PrivacyPage, TermsPage,
+  ContactPage, FaqPage, NotFoundPage,
+} from './src/pages/StaticPages';
+import { ProductsPage, ProductPage } from './src/pages/StorePages';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, limit,
@@ -514,7 +522,8 @@ function ProductDetailModal({ product, allProducts = [], onClose, onAddToCart, o
 
           {/* Middle Column - Details & Size Table */}
           <div className="p-5 md:p-7 border-b lg:border-b-0 lg:border-r border-gray-100">
-            <h3 className="font-display text-xl md:text-2xl font-extrabold text-gray-900 leading-tight mb-4">{product.title}</h3>
+            <h3 className="font-display text-xl md:text-2xl font-extrabold text-gray-900 leading-tight mb-2">{product.title}</h3>
+            <Link to={`/product/${encodeURIComponent(product.id)}`} onClick={onClose} className="inline-block text-xs text-red-600 underline underline-offset-2 mb-4">পূর্ণ পেজে দেখুন</Link>
             
             <div className="flex gap-4 items-center bg-gray-50 rounded-lg p-3 mb-5 border border-gray-100">
                <div className="flex-1 text-center border-r border-gray-200">
@@ -2523,18 +2532,7 @@ function CopyableNumber({ number }) {
   );
 }
 
-const FAQ_LIST = [
-  { q: "আপনারা কিভাবে কাজ করেন?", a: "আমরা মূলত চায়না থেকে আপনার পছন্দের পণ্য সোর্সিং করে বাংলাদেশে ডেলিভারি দিয়ে থাকি।" },
-  { q: "ডেলিভারি সময় কতদিন?", a: "ডেলিভারি টাইম সাধারণত ১৫-২০ দিনের কম সময়ে চলে আসে, তবে সেফটি পারপাসে একটু বেশি সময় নেওয়া হয়।" },
-  { q: "শিপিং চার্জ কত?", a: "চায়না থেকে বাংলাদেশে বাসা পর্যন্ত ডেলিভারী এবং শিপিং চার্জ ৯০০ টাকা প্রতি কেজি। তবে এই চার্জটি অনুমানিক, একুরেট না। প্রোডাক্ট দেশে আসার পর আসল ওজন মেপে একুরেট চার্জ ধরা হয়।" },
-  { q: "সী শিপমেন্ট কি চালু আছে?", a: "আমাদের সী শিপমেন্ট এখন চালু নেই, তবে বাল্ক অর্ডারে (বেশি পরিমাণে) আমরা এটি চালু করবো।" },
-  { q: "এডভান্স পেমেন্ট করতে হবে কি?", a: "হ্যাঁ, অর্ডার কনফার্ম করতে অন্তত ৫০% এডভান্স পেমেন্ট প্রযোজ্য।" },
-  { q: "প্রোডাক্ট রিটার্ন পলিসি কি?", a: "সোর্সিং প্রোডাক্ট হওয়ায় সাধারণত রিটার্ন হয় না, তবে ভাঙা বা ভুল প্রোডাক্ট পেলে আমরা ক্ষতিপূরণ দিয়ে থাকি।" },
-  { q: "কাস্টমাইজড প্রোডাক্ট আনা যাবে?", a: "হ্যাঁ, আপনার চাহিদা অনুযায়ী চায়না থেকে কাস্টমাইজড প্রোডাক্ট আনা সম্ভব।" },
-  { q: "অর্ডার ট্র্যাক করব কিভাবে?", a: "লগ ইন করে 'আমার অর্ডার' সেকশন থেকে আপনার অর্ডারের বর্তমান স্ট্যাটাস দেখতে পারবেন।" },
-  { q: "মিনিমাম অর্ডার কোয়ান্টিটি (MOQ) কত?", a: "প্রোডাক্ট অনুযায়ী MOQ ভিন্ন হয়, তবে সাধারণত ১ পিসও আনা যায়। হোলসেলের জন্য বেশি নিতে হয়।" },
-  { q: "যোগাযোগের উপায় কি?", a: "আপনি আমাদের হটলাইন নম্বরে অথবা ফেসবুক পেজে মেসেজ দিয়ে যোগাযোগ করতে পারেন।" }
-];
+// FAQ_LIST এখন src/site.ts-এ (FAQ পেজ ও চ্যাটবট একই তালিকা ব্যবহার করে)
 
 function FAQChatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -2610,6 +2608,56 @@ function FAQChatbot() {
   );
 }
 
+// --- সব পেজে একই ফুটার ---
+function SiteFooter() {
+  const col = (title, links) => (
+    <div>
+      <h3 className="font-bold text-white mb-3">{title}</h3>
+      <div className="space-y-2 text-sm">
+        {links.map((l) => <Link key={l.to} to={l.to} className="block hover:text-white">{l.label}</Link>)}
+      </div>
+    </div>
+  );
+  return (
+    <footer className="bg-slate-950 text-slate-300">
+      <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-8">
+        <div>
+          <Link to="/" className="flex items-center gap-2 font-display text-xl font-extrabold text-white">
+            <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
+            Druto<span className="font-medium text-slate-300">Link</span>
+          </Link>
+          <p className="text-sm leading-6 text-slate-400 max-w-md mt-4">চীন থেকে পণ্য সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির জন্য একটি সহজ ও আধুনিক প্ল্যাটফর্ম।</p>
+          <ul className="mt-4 space-y-1.5 text-sm text-slate-400">
+            <li className="flex items-center gap-2"><MapPin className="h-4 w-4 shrink-0" /> {SITE.location}</li>
+            {SITE.phone && <li className="flex items-center gap-2"><PhoneIcon className="h-4 w-4 shrink-0" /> <a href={`tel:${SITE.phone}`} className="hover:text-white">{SITE.phone}</a></li>}
+            {SITE.email && <li className="flex items-center gap-2"><Mail className="h-4 w-4 shrink-0" /> <a href={`mailto:${SITE.email}`} className="hover:text-white">{SITE.email}</a></li>}
+          </ul>
+          <div className="flex gap-4 mt-5">
+            <a href={SITE.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-2 bg-slate-800/80 rounded-full hover:bg-blue-600 hover:text-white transition-all text-slate-300"><Facebook className="h-5 w-5" /></a>
+            <a href={SITE.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-2 bg-slate-800/80 rounded-full hover:bg-pink-600 hover:text-white transition-all text-slate-300"><Instagram className="h-5 w-5" /></a>
+            {SITE.whatsapp && <a href={`https://wa.me/${SITE.whatsapp}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="p-2 bg-slate-800/80 rounded-full hover:bg-green-600 hover:text-white transition-all text-slate-300"><MessageCircle className="h-5 w-5" /></a>}
+          </div>
+        </div>
+        {col('দ্রুত লিংক', [
+          { to: '/', label: 'হোম' }, { to: '/products', label: 'সব পণ্য' }, { to: '/how-it-works', label: 'কীভাবে কাজ করে' },
+          { to: '/track-order', label: 'অর্ডার ট্র্যাক' }, { to: '/about', label: 'আমাদের সম্পর্কে' }, { to: '/contact', label: 'যোগাযোগ' },
+        ])}
+        {col('ক্যাটাগরি', CATEGORIES.map((c) => ({ to: categoryPath(c.name), label: c.name })))}
+        {col('সাপোর্ট ও পলিসি', [
+          { to: '/faq', label: 'প্রশ্নোত্তর (FAQ)' }, { to: '/shipping', label: 'শিপিং ও ডেলিভারি' }, { to: '/return-policy', label: 'রিটার্ন ও ক্ষতিপূরণ' },
+          { to: '/privacy-policy', label: 'প্রাইভেসি পলিসি' }, { to: '/terms', label: 'শর্তাবলী' },
+        ])}
+      </div>
+      <div className="border-t border-white/10">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row gap-2 items-center justify-between text-xs text-slate-500">
+          <span>© ২০২৬ DrutoLink. সর্বস্বত্ব সংরক্ষিত।</span>
+          <span>বিকাশ ও নগদ পেমেন্ট সুবিধা</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function AboutSection() {
   return (
     <section className="bg-white py-16 lg:py-24 border-t border-gray-100 relative overflow-hidden">
@@ -2673,15 +2721,16 @@ export default function App() {
   // সাইটে আর কোনো "স্টাফ" বাটন/লিংক নেই, তাই লিংক দুটো যাদের জানা আছে শুধু তারাই ঢুকতে পারবে।
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
-      const p = window.location.pathname.replace(/\/+$/, ''); // শেষের স্ল্যাশ বাদ
-      if (p === '/admin') return 'admin';
-      if (p === '/worker') return 'worker';
       // পুরনো #admin / #worker হ্যাশ লিংক থেকে এলেও যেন কাজ করে (ব্যাকওয়ার্ড কম্প্যাটিবিলিটি)
       const h = window.location.hash.replace('#', '');
-      if (h === 'admin' || h === 'worker') return h;
+      if ((h === 'admin' || h === 'worker') && window.location.pathname.replace(/\/+$/, '') === '') return h;
+      return parsePath(window.location.pathname).view; // /products, /about, /product/:id ...
     }
     return 'home';
   });
+  // /product/:id বা /category/:slug-এর শেষের অংশ
+  const [routeParam, setRouteParam] = useState(() =>
+    typeof window !== 'undefined' ? (parsePath(window.location.pathname).param || '') : '');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -2715,28 +2764,28 @@ export default function App() {
   const productsRef = useRef(null);
   const howItWorksRef = useRef(null);
 
-  // currentView admin/worker হলে URL পাথ (/admin বা /worker) আপডেট রাখি, যাতে
-  // লিংকটা বুকমার্ক করা যায় এবং রিফ্রেশ দিলেও সরাসরি প্যানেলে ঢোকা যায়।
-  // হোমে ফিরলে পাথ আবার "/"-এ রিসেট হয়ে যায়।
+  // currentView বদলালে URL পাথও বদলে যায় (/products, /about, /product/abc ...),
+  // যাতে প্রতিটা পেজের আলাদা লিংক থাকে — বুকমার্ক, শেয়ার ও রিফ্রেশে ঠিকঠাক কাজ করে।
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (currentView === 'admin' || currentView === 'worker') {
-      const targetPath = `/${currentView}`;
-      if (window.location.pathname !== targetPath) {
-        history.pushState(null, '', targetPath + window.location.search);
-      }
-    } else if (window.location.pathname === '/admin' || window.location.pathname === '/worker') {
-      history.pushState(null, '', '/' + window.location.search);
+    if (typeof window === 'undefined' || currentView === 'notfound') return;
+    const target = buildPath(currentView, routeParam || undefined);
+    const norm = (x) => x.replace(/\/+$/, '');
+    if (norm(window.location.pathname) !== norm(target)) {
+      history.pushState(null, '', target + window.location.search);
     }
-  }, [currentView]);
+  }, [currentView, routeParam]);
 
-  // ব্রাউজারের Back/Forward বাটন চাপলেও currentView URL পাথের সাথে সিঙ্ক থাকে।
+  // নতুন পেজে গেলে উপরে স্ক্রল
+  useEffect(() => { window.scrollTo(0, 0); }, [currentView, routeParam]);
+
+  // ব্রাউজারের Back/Forward বাটন বা navigate() কল করলে currentView URL-এর সাথে সিঙ্ক থাকে।
   useEffect(() => {
     const onPopState = () => {
-      const p = window.location.pathname.replace(/\/+$/, '');
-      if (p === '/admin') setCurrentView('admin');
-      else if (p === '/worker') setCurrentView('worker');
-      else setCurrentView('home');
+      const r = parsePath(window.location.pathname);
+      setCurrentView(r.view);
+      setRouteParam(r.param || '');
+      setMobileNavOpen(false);
+      setDetailProduct(null);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -2830,6 +2879,31 @@ export default function App() {
   // ক্যাটাগরি বদলানোর সময় এটা কল করলে লিমিট ২০-তে রিসেট হয়ে যায়, নাহলে আগের
   // ক্যাটাগরিতে "আরও দেখুন" চেপে বাড়ানো লিমিট নতুন ক্যাটাগরিতেও থেকে যেত
   const resetStorefrontPaging = () => setStorefrontLimit(STOREFRONT_PAGE_SIZE);
+
+  // --- নতুন পেজগুলোর (/products, /category/:slug, /product/:id) ডেটা ও মেটা ---
+  // /products খুললে ক্যাটাগরি ফিল্টার সাফ, /category/xxx খুললে সেই ক্যাটাগরি সেট হয়।
+  // হোমে ফিরলে এই পেজগুলোর সেট করা ক্যাটাগরি মুছে দিই, যাতে হোমের গ্রিড আগের মতোই থাকে।
+  const prevViewRef = useRef(currentView);
+  useEffect(() => {
+    const prev = prevViewRef.current;
+    prevViewRef.current = currentView;
+    if (currentView === 'products') { setSelectedCategory(null); resetStorefrontPaging(); }
+    else if (currentView === 'category') { setSelectedCategory(slugToCategory(routeParam)); resetStorefrontPaging(); }
+    else if (currentView === 'home' && (prev === 'category' || prev === 'product')) { setSelectedCategory(null); resetStorefrontPaging(); }
+  }, [currentView, routeParam]);
+
+  useEffect(() => {
+    if (currentView === 'product') return; // প্রোডাক্ট পেজ নিজের টাইটেল নিজে বসায়
+    const m = pageMeta(currentView, slugToCategory(routeParam));
+    if (m) applyMeta(m[0], m[1]);
+  }, [currentView, routeParam]);
+
+  // প্রোডাক্ট পেজে "একই ক্যাটাগরির পণ্য" দেখাতে — ক্যাটালগ ও স্টোরফ্রন্ট দুটোর পণ্য একসাথে
+  const knownProducts = useMemo(() => {
+    const m = new Map();
+    [...storefrontProducts, ...products].forEach((p) => m.set(p.id, p));
+    return Array.from(m.values());
+  }, [products, storefrontProducts]);
 
   // ফিক্স: আগে টেক্সট-সার্চ শুধু storefrontProducts (হোমপেজে যতটুকু ইতিমধ্যে
   // লোড হয়েছে, ডিফল্ট ২০টা) এর মধ্যে খুঁজত — ফলে খোঁজা প্রোডাক্ট ওই প্রথম ২০টার
@@ -3704,12 +3778,70 @@ export default function App() {
     );
   }
 
+  // --- নতুন পেজগুলো (হোম বাদে) — একই হেডার/কার্ট/ফুটারের ভেতরে দেখায় ---
+  const catalogList = ((visual.active || searchQuery.trim()) && selectedCategory)
+    ? visibleProducts.filter((p) => p.category === selectedCategory)
+    : visibleProducts;
+  const listLoading = searchQuery.trim() ? catalogLoading : storefrontLoading;
+
+  const renderPage = () => {
+    switch (currentView) {
+      case 'products':
+      case 'category': {
+        const catName = currentView === 'category' ? slugToCategory(routeParam) : null;
+        if (currentView === 'category' && !catName) return <NotFoundPage />;
+        return (
+          <ProductsPage
+            title={catName || 'সব পণ্য'}
+            subtitle={catName ? `${catName} ক্যাটাগরির পণ্য — পছন্দেরটি বেছে কার্টে যোগ করুন।` : 'ক্যাটাগরি, নাম বা ছবি দিয়ে পণ্য খুঁজুন। ক্যাটালগে না পেলে আমরা চীন থেকে সোর্স করে দিতে পারি।'}
+            activeCategory={catName}
+            categories={CATEGORIES}
+            products={catalogList}
+            loading={listLoading}
+            hasMore={storefrontHasMore}
+            loadingMore={loadingMoreProducts}
+            onLoadMore={handleShowMoreProducts}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onAddToCart={handleAddToCart}
+            onImageSearch={openImageSearch}
+            imageSearching={visual.searching}
+            visualActive={visual.active}
+            onClearVisual={visual.clear}
+            queryImage={visual.queryImage}
+          />
+        );
+      }
+      case 'product':
+        return (
+          <ProductPage
+            key={routeParam}
+            productId={routeParam}
+            knownProducts={knownProducts}
+            onAddToCart={handleAddToCart}
+            getWeightKg={getEstimatedWeightKg}
+            onApplyMeta={applyMeta}
+            onCategoryHint={(c) => setSelectedCategory((cur) => (cur === c ? cur : c))}
+          />
+        );
+      case 'about': return <AboutPage><AboutSection /></AboutPage>;
+      case 'how': return <HowItWorksPage />;
+      case 'shipping': return <ShippingPage />;
+      case 'returns': return <ReturnPolicyPage />;
+      case 'privacy': return <PrivacyPage />;
+      case 'terms': return <TermsPage />;
+      case 'contact': return <ContactPage />;
+      case 'faq': return <FaqPage />;
+      default: return <NotFoundPage />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white font-body text-gray-900">
       <style>{FONTS}</style>
 
       {/* এন্ট্রি পপ-আপ — সাইটে ঢোকার সাথে সাথেই দেখায় */}
-      {showPromoPopup && (
+      {showPromoPopup && currentView === 'home' && (
         <div
           className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
           onClick={closePromoPopup}
@@ -3775,10 +3907,6 @@ export default function App() {
               <Search className="h-4 w-4" />
             </button>
           </form>
-          <nav className="hidden xl:flex items-center gap-5 text-sm font-medium text-white/95">
-            <button onClick={scrollToHowItWorks} className="hover:text-white/70 transition-colors">কীভাবে কাজ করে</button>
-            <button onClick={goToOrders} className="hover:text-white/70 transition-colors">অর্ডার ট্র্যাক</button>
-          </nav>
           <div className="flex items-center gap-4 text-sm">
             {isCustomerLoggedIn ? (
               <div onClick={() => setCurrentView('account')} className="flex flex-col items-center cursor-pointer transition-opacity hover:opacity-80">
@@ -3800,6 +3928,23 @@ export default function App() {
             </div>
           </div>
         </div>
+        {/* দ্বিতীয় সারি — ডেস্কটপে মূল পেজগুলোর লিংক */}
+        <nav aria-label="প্রধান মেনু" className="hidden lg:block bg-red-800/90 border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-4 flex items-center gap-6 text-sm font-medium text-white/95 overflow-x-auto">
+            {[
+              { to: '/', label: 'হোম' },
+              { to: '/products', label: 'সব পণ্য' },
+              { to: '/how-it-works', label: 'কীভাবে কাজ করে' },
+              { to: '/shipping', label: 'শিপিং ও ডেলিভারি' },
+              { to: '/about', label: 'আমাদের সম্পর্কে' },
+              { to: '/faq', label: 'প্রশ্নোত্তর' },
+              { to: '/contact', label: 'যোগাযোগ' },
+            ].map((l) => (
+              <Link key={l.to} to={l.to} className={`py-2.5 whitespace-nowrap border-b-2 transition-colors hover:text-white ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
+            ))}
+            <button onClick={goToOrders} className="py-2.5 whitespace-nowrap border-b-2 border-transparent hover:text-white ml-auto">অর্ডার ট্র্যাক</button>
+          </div>
+        </nav>
       </header>
 
       {/* মোবাইল নেভিগেশন ড্রয়ার — হেডারের ৩-বার আইকনে ক্লিক করলে বাম থেকে খুলবে */}
@@ -3854,18 +3999,33 @@ export default function App() {
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">ক্যাটাগরি</p>
           <div className="space-y-1 mb-5">
             <button
-              onClick={() => { setSelectedCategory(null); resetStorefrontPaging(); setMobileNavOpen(false); scrollToProducts(); }}
+              onClick={() => { setMobileNavOpen(false); navigate('/products'); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${!selectedCategory ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
               <span className="text-lg">🛍️</span> সব প্রোডাক্ট
             </button>
             {CATEGORIES.map((c) => (
               <button
                 key={c.name}
-                onClick={() => { setSelectedCategory(c.name); resetStorefrontPaging(); setMobileNavOpen(false); scrollToProducts(); }}
+                onClick={() => { setMobileNavOpen(false); navigate(categoryPath(c.name)); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategory === c.name ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
                 <span className="text-lg">{c.emoji}</span> {c.name}
               </button>
             ))}
+          </div>
+
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">পেজসমূহ</p>
+          <div className="space-y-1">
+            {[
+              { to: '/how-it-works', label: 'কীভাবে কাজ করে' },
+              { to: '/shipping', label: 'শিপিং ও ডেলিভারি' },
+              { to: '/about', label: 'আমাদের সম্পর্কে' },
+              { to: '/faq', label: 'প্রশ্নোত্তর' },
+              { to: '/contact', label: 'যোগাযোগ' },
+              { to: '/return-policy', label: 'রিটার্ন ও ক্ষতিপূরণ' },
+            ].map((l) => (
+              <Link key={l.to} to={l.to} onClick={() => setMobileNavOpen(false)} className="block px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">{l.label}</Link>
+            ))}
+            <button onClick={() => { setMobileNavOpen(false); goToOrders(); }} className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50">অর্ডার ট্র্যাক</button>
           </div>
         </div>
       </div>
@@ -4004,6 +4164,11 @@ export default function App() {
             {orderSubmitting ? 'সাবমিট হচ্ছে...' : isCustomerLoggedIn ? 'অর্ডার নিশ্চিত করুন' : 'লগ ইন করে অর্ডার নিশ্চিত করুন'}
           </button>
         </div>
+      ) : currentView !== 'home' ? (
+        <>
+          {renderPage()}
+          <SiteFooter />
+        </>
       ) : (
         <>
           {/* Homepage 2.0 — premium hero */}
@@ -4257,45 +4422,14 @@ export default function App() {
                 </button>
               </div>
             )}
+            <div className="flex justify-center mt-6">
+              <Link to="/products" className="text-sm font-semibold text-red-700 hover:underline">সব পণ্য ও ক্যাটাগরি দেখুন →</Link>
+            </div>
           </section>
 
           <AboutSection />
 
-          {/* Footer */}
-          <footer className="bg-slate-950 text-slate-300">
-            <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-3 gap-8">
-              <div className="md:col-span-2">
-                <div className="flex items-center gap-2 font-display text-xl font-extrabold text-white">
-                  <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
-                  Druto<span className="font-medium text-slate-300">Link</span>
-                </div>
-                <p className="text-sm leading-6 text-slate-400 max-w-md mt-4">চীন থেকে পণ্য সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির জন্য একটি সহজ ও আধুনিক প্ল্যাটফর্ম।</p>
-                <div className="flex gap-4 mt-6">
-                  <a href="https://www.facebook.com/profile.php?id=61594579977315" target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-800/80 rounded-full hover:bg-blue-600 hover:text-white transition-all text-slate-300">
-                    <Facebook className="h-5 w-5" />
-                  </a>
-                  <a href="https://www.instagram.com/drutolink/" target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-800/80 rounded-full hover:bg-pink-600 hover:text-white transition-all text-slate-300">
-                    <Instagram className="h-5 w-5" />
-                  </a>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-3">দ্রুত লিংক</h3>
-                <div className="space-y-2 text-sm">
-                  <button onClick={() => setCurrentView('home')} className="block hover:text-white">হোম</button>
-                  <button onClick={scrollToProducts} className="block hover:text-white">পণ্য</button>
-                  <button onClick={scrollToHowItWorks} className="block hover:text-white">কীভাবে কাজ করে</button>
-                  <button onClick={goToOrders} className="block hover:text-white">অর্ডার ট্র্যাক</button>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-white/10">
-              <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row gap-2 items-center justify-between text-xs text-slate-500">
-                <span>© ২০২৬ DrutoLink. সর্বস্বত্ব সংরক্ষিত।</span>
-                <span>বিকাশ ও নগদ পেমেন্ট সুবিধা</span>
-              </div>
-            </div>
-          </footer>
+          <SiteFooter />
         </>
       )}
       {currentView !== 'admin' && currentView !== 'worker' && <FAQChatbot />}
