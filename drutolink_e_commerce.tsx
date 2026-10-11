@@ -6,6 +6,9 @@ import slide3Asset from './slide3.png';
 import slide4Asset from './slide4.png';
 import slide5Asset from './slide5.png';
 import promoPopupAsset from './promo-popup.jpg';
+import shipmentWarehouseAsset from './shipment-warehouse.jpg';
+import shipmentDeliveryAsset from './shipment-delivery.jpg';
+import shipmentLabelsAsset from './shipment-labels.jpg';
 const productPlaceholderAsset = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23f3f4f6'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'>No Image</text></svg>";
 import {
   Search, ShieldCheck, Truck, Wallet, Package, Plane, ChevronRight, ChevronLeft,
@@ -2841,6 +2844,37 @@ function AboutSection() {
   );
 }
 
+function ShipmentGallery() {
+  const photos = [
+    { src: shipmentWarehouseAsset, alt: 'ডেলিভারির জন্য প্রস্তুত শিপমেন্ট', cap: 'চীন থেকে আসা পণ্য — প্যাকিং শেষে ডেলিভারির জন্য প্রস্তুত' },
+    { src: shipmentDeliveryAsset, alt: 'রিকশায় পার্সেল ডেলিভারি', cap: 'গ্রাহকের ঠিকানায় পৌঁছানোর পথে পার্সেল' },
+    { src: shipmentLabelsAsset, alt: 'পার্সেলের লেবেল', cap: 'প্রতিটি পার্সেলে আলাদা লেবেল ও QR কোড' },
+  ];
+  return (
+    <section className="bg-slate-50 py-16 lg:py-20 border-t border-gray-100">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-red-50 border border-red-100 px-3 py-1.5 text-xs font-bold text-red-700 mb-4 shadow-sm">
+            <Award className="h-4 w-4" /> আসল শিপমেন্টের ছবি
+          </div>
+          <h2 className="font-display text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">আমাদের একটি আসল চালানের ঝলক</h2>
+          <p className="text-sm text-gray-500 mt-3">সেপ্টেম্বর ২০২৬-এর একটি শিপমেন্ট। গ্রাহকের গোপনীয়তার জন্য নাম, ফোন, ঠিকানা ও QR কোড ব্লার করা হয়েছে।</p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {photos.map((p) => (
+            <figure key={p.src} className="bg-white rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5">
+              <a href={p.src} target="_blank" rel="noopener noreferrer">
+                <img src={p.src} alt={p.alt} loading="lazy" className="w-full h-72 object-cover hover:scale-[1.03] transition-transform duration-300" />
+              </a>
+              <figcaption className="p-4 text-sm font-medium text-gray-700 leading-6">{p.cap}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // --- MAIN STOREFRONT & PASSWORD GATE COMPONENT ---
 export default function App() {
   // অ্যাডমিন/ওয়ার্কার প্যানেলে সরাসরি ঢোকার একমাত্র পথ এখন URL —
@@ -3951,7 +3985,7 @@ export default function App() {
             onCategoryHint={(c) => setSelectedCategory((cur) => (cur === c ? cur : c))}
           />
         );
-      case 'about': return <AboutPage><AboutSection /></AboutPage>;
+      case 'about': return <AboutPage><AboutSection /><ShipmentGallery /></AboutPage>;
       case 'how': return <HowItWorksPage />;
       case 'shipping': return <ShippingPage />;
       case 'returns': return <ReturnPolicyPage />;
