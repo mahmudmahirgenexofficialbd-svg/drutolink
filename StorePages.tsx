@@ -17,21 +17,21 @@ export function ProductCard({ p, onAddToCart }: { p: any; onAddToCart: (p: any, 
   return (
     <div className="group bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/70 hover:-translate-y-1 hover:border-gray-300">
       <Link to={href} className="block overflow-hidden relative w-full bg-gray-50" aria-label={p.title}>
-        <img src={p.image} alt={p.title} loading="lazy" className="h-40 md:h-48 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
+        <img src={p.image} alt={p.title} loading="lazy" className="h-40 sm:h-44 md:h-48 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
       </Link>
       <div className="p-3.5 flex flex-col flex-1">
-        <Link to={href}><h3 className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2 group-hover:text-red-700 transition-colors">{p.title}</h3></Link>
+        <Link to={href}><h3 className="text-[13px] sm:text-sm font-medium text-gray-700 leading-snug line-clamp-2 min-h-[2.5rem] group-hover:text-red-700 transition-colors">{p.title}</h3></Link>
         {hasVariants && (
           <p className="text-[11px] text-gray-400 mt-1">
             {p.sizes?.length ? `${p.sizes.length} সাইজ` : ''}{p.sizes?.length && p.colors?.length ? ' · ' : ''}{p.colors?.length ? `${p.colors.length} কালার` : ''}
           </p>
         )}
-        <div className="mt-auto pt-3 flex items-center justify-between gap-2">
-          <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
+        <div className="mt-auto pt-3 flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+          <span className="font-display text-red-700 font-bold text-base whitespace-nowrap"><span className="text-xs font-semibold mr-0.5">৳</span>{p.price}</span>
           {hasVariants ? (
-            <Link to={href} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">অপশন বাছাই</Link>
+            <Link to={href} className="w-full min-[420px]:w-auto text-center whitespace-nowrap bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">অপশন বাছাই</Link>
           ) : (
-            <button onClick={() => onAddToCart(p)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">কার্টে যোগ করুন</button>
+            <button onClick={() => onAddToCart(p)} className="w-full min-[420px]:w-auto whitespace-nowrap bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">কার্টে যোগ করুন</button>
           )}
         </div>
       </div>
@@ -52,13 +52,25 @@ export function ProductsPage({
 }) {
   const [sort, setSort] = useState<'new' | 'low' | 'high'>('new');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
 
   const sorted = useMemo(() => {
-    if (sort === 'new' || visualActive) return products; // ছবি-সার্চে মিলের ক্রমই রাখি
-    const arr = products.slice();
+    const lo = minPrice.trim() === '' ? null : Number(minPrice);
+    const hi = maxPrice.trim() === '' ? null : Number(maxPrice);
+    let arr = products;
+    if (lo != null || hi != null) {
+      arr = products.filter((p) => {
+        const price = Number(p.price);
+        return (lo == null || price >= lo) && (hi == null || price <= hi);
+      });
+    }
+    if (sort === 'new' || visualActive) return arr; // ছবি-সার্চে মিলের ক্রমই রাখি
+    arr = arr.slice();
     arr.sort((a, b) => (sort === 'low' ? Number(a.price) - Number(b.price) : Number(b.price) - Number(a.price)));
     return arr;
-  }, [products, sort, visualActive]);
+  }, [products, sort, visualActive, minPrice, maxPrice]);
+  const priceFiltered = minPrice.trim() !== '' || maxPrice.trim() !== '';
 
   const CategoryList = (
     <div className="space-y-1">
@@ -78,7 +90,7 @@ export function ProductsPage({
   return (
     <main>
       <section className="bg-slate-50 border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-8 md:py-10">
+        <div className="max-w-7xl mx-auto px-4 py-8 md:py-10">
           <nav aria-label="breadcrumb" className="text-xs text-gray-500 flex items-center gap-1.5 mb-3">
             <Link to="/" className="hover:text-red-600">হোম</Link><ChevronRight className="h-3 w-3" />
             {activeCategory ? (<><Link to="/products" className="hover:text-red-600">সব পণ্য</Link><ChevronRight className="h-3 w-3" /><span className="text-gray-800 font-medium">{activeCategory}</span></>)
@@ -89,7 +101,7 @@ export function ProductsPage({
         </div>
       </section>
 
-      <div className="max-w-6xl mx-auto px-4 py-8 grid lg:grid-cols-[230px_1fr] gap-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-[230px_1fr] gap-8">
         {/* ডেস্কটপ সাইডবার */}
         <aside className="hidden lg:block">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">ক্যাটাগরি</p>
@@ -115,6 +127,20 @@ export function ProductsPage({
               <option value="high">দাম: বেশি → কম</option>
             </select>
             <button onClick={() => setFilterOpen(true)} className="lg:hidden rounded-xl border border-gray-300 py-2.5 px-4 text-sm font-semibold text-gray-700">ক্যাটাগরি</button>
+          </div>
+
+          {/* দামের সীমা */}
+          <div className="flex flex-wrap items-center gap-2 mb-5 text-sm">
+            <span className="text-gray-600 font-medium">দাম (৳):</span>
+            <input type="number" inputMode="numeric" min="0" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="সর্বনিম্ন" aria-label="সর্বনিম্ন দাম"
+              className="w-28 rounded-lg border border-gray-300 py-2 px-3 outline-none focus:border-red-500" />
+            <span className="text-gray-400">—</span>
+            <input type="number" inputMode="numeric" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="সর্বোচ্চ" aria-label="সর্বোচ্চ দাম"
+              className="w-28 rounded-lg border border-gray-300 py-2 px-3 outline-none focus:border-red-500" />
+            {priceFiltered && (
+              <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="text-xs font-semibold text-red-700 hover:underline">ফিল্টার মুছুন ✕</button>
+            )}
+            {priceFiltered && <span className="text-xs text-gray-500">{sorted.length} টি পণ্য</span>}
           </div>
 
           {visualActive && (
@@ -236,7 +262,7 @@ export function ProductPage({ productId, knownProducts, onAddToCart, getWeightKg
   );
 
   if (state === 'loading') {
-    return <main className="max-w-6xl mx-auto px-4 py-16 text-center text-sm text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-red-600" />পণ্য লোড হচ্ছে...</main>;
+    return <main className="max-w-7xl mx-auto px-4 py-16 text-center text-sm text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-red-600" />পণ্য লোড হচ্ছে...</main>;
   }
   if (!product) {
     return (
@@ -260,7 +286,7 @@ export function ProductPage({ productId, knownProducts, onAddToCart, getWeightKg
   };
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
+    <main className="max-w-7xl mx-auto px-4 py-8">
       {crumb}
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         <div>
