@@ -696,7 +696,7 @@ function ProductDetailModal({ product, allProducts = [], onClose, onAddToCart, o
             <div className="bg-gray-50 rounded-lg p-4 text-sm border border-gray-200">
                <div className="flex justify-between py-1.5 border-b border-gray-200"><span className="text-gray-500 font-medium">Product Quantity</span><span className="font-bold text-gray-800">{quantity} <span className="text-[10px] text-gray-400 font-normal ml-1">Minimum Quantity: 1</span></span></div>
                <div className="flex justify-between py-1.5 border-b border-gray-200"><span className="text-gray-500 font-medium">Product Price</span><span className="font-bold text-red-600">৳ {Number(product.price) * quantity}</span></div>
-               <div className="flex justify-between py-1.5"><span className="text-gray-500 font-medium">Shipping Charge</span><span className="font-bold text-gray-800">৳ 900 Per Kg <span className="text-[10px] text-gray-400 font-normal ml-1">(আনুমানিক)</span></span></div>
+               <div className="flex justify-between py-1.5"><span className="text-gray-500 font-medium">Shipping Charge</span><span className="font-bold text-gray-800">৳ 900 Per Kg <span className="text-[10px] text-gray-400 font-normal ml-1">(নির্দিষ্ট রেট)</span></span></div>
                <div className="mt-3 text-[11px] text-red-600 bg-red-50/80 p-2.5 rounded-lg border border-red-100 leading-tight">
                  <strong>বিঃদ্রঃ</strong> শিপিং চার্জ ৯০০ টাকা প্রতি কেজি, কিন্তু ওয়েবসাইটে প্রোডাক্টে যা শো করে তা ১০০% একুরেট না। প্রোডাক্ট দেশে আসার পর আসল ওজন মেপে চূড়ান্ত শিপিং চার্জ ধরা হবে।
                </div>
