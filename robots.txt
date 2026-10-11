@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /worker
+Disallow: /checkout
+Disallow: /account
+
+Sitemap: https://www.drutolink.shop/sitemap.xml
