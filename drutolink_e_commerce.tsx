@@ -2863,9 +2863,7 @@ function ShipmentGallery() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {photos.map((p) => (
             <figure key={p.src} className="bg-white rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5">
-              <a href={p.src} target="_blank" rel="noopener noreferrer">
-                <img src={p.src} alt={p.alt} loading="lazy" className="w-full h-72 object-cover hover:scale-[1.03] transition-transform duration-300" />
-              </a>
+              <img src={p.src} alt={p.alt} loading="lazy" className="w-full h-72 object-cover" />
               <figcaption className="p-4 text-sm font-medium text-gray-700 leading-6">{p.cap}</figcaption>
             </figure>
           ))}
