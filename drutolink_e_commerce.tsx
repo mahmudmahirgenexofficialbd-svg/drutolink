@@ -167,6 +167,97 @@ const STEP_ICONS = [StepIconChoose, StepIconPay, StepIconShip];
 // "৩ ধাপে অর্ডার করুন" সেকশনের একেকটা কার্ড। useInView দিয়ে বোঝে কখন স্ক্রল করে
 // চোখের সামনে এসেছে, আর index অনুযায়ী সামান্য দেরি করে একে একে ভেসে ওঠে (স্ট্যাগার ইফেক্ট)।
 // নম্বরের বদলে কার্টুন-স্টাইল আইকন — নম্বরটা এখন ছোট চিপ হিসেবে কোণায় থাকে, ধাপের ক্রমটা বোঝাতে।
+// ক্যাটাগরি বার — নিজে নিজে ডানে সরে, কিন্তু ইউজার চাইলে মাউস/আঙুল দিয়ে টেনে বা তীর চেপে
+// আগে-পিছে নিতে পারে। ইউজার ধরলে বা হোভার করলে অটো-স্ক্রল থেমে যায়।
+function CategoryScroller({ categories, selected, onSelect }) {
+  const ref = useRef(null);
+  const hovering = useRef(false);
+  const pauseUntil = useRef(0);
+  const drag = useRef({ down: false, startX: 0, startLeft: 0, moved: false });
+  const [dragging, setDragging] = useState(false);
+  const items = useMemo(() => [...categories, ...categories], [categories]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let raf = 0, last = performance.now(), acc = 0;
+    const tick = (now) => {
+      const dt = now - last; last = now;
+      const half = el.scrollWidth / 2;
+      if (!hovering.current && !drag.current.down && now > pauseUntil.current) {
+        acc += dt * 0.035; // প্রায় ৩৫ পিক্সেল/সেকেন্ড
+        if (acc >= 1) { const step = Math.floor(acc); acc -= step; el.scrollLeft += step; }
+      }
+      // দুই কপির মাঝে লুপ — আগে বা পিছে যেদিকেই যাক, ফাঁকা পড়ে না
+      if (half > 0) {
+        if (el.scrollLeft >= half) el.scrollLeft -= half;
+        else if (el.scrollLeft < 1) el.scrollLeft += half;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [items]);
+
+  const holdAuto = (ms = 3000) => { pauseUntil.current = performance.now() + ms; };
+  const nudge = (dir) => {
+    const el = ref.current; if (!el) return;
+    holdAuto(4000);
+    el.scrollBy({ left: dir * 320, behavior: 'smooth' });
+  };
+
+  const onPointerDown = (e) => {
+    if (e.pointerType !== 'mouse') return; // টাচে ব্রাউজারের নিজস্ব স্ক্রলই চলবে
+    const el = ref.current; if (!el) return;
+    drag.current = { down: true, startX: e.clientX, startLeft: el.scrollLeft, moved: false };
+  };
+  const onPointerMove = (e) => {
+    const d = drag.current; if (!d.down) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 5) { d.moved = true; setDragging(true); }
+    if (d.moved && ref.current) ref.current.scrollLeft = d.startLeft - dx;
+  };
+  const endDrag = () => {
+    if (!drag.current.down) return;
+    drag.current.down = false;
+    setDragging(false);
+    holdAuto(2500);
+    setTimeout(() => { drag.current.moved = false; }, 0);
+  };
+
+  return (
+    <div className="relative">
+      <button type="button" aria-label="আগের ক্যাটাগরি" onClick={() => nudge(-1)}
+        className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 h-9 w-9 items-center justify-center rounded-full bg-white border border-gray-200 shadow text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors">
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+      <button type="button" aria-label="পরের ক্যাটাগরি" onClick={() => nudge(1)}
+        className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 h-9 w-9 items-center justify-center rounded-full bg-white border border-gray-200 shadow text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors">
+        <ChevronRight className="h-5 w-5" />
+      </button>
+      <div ref={ref}
+        className={`cat-scroller pb-2 ${dragging ? 'is-dragging' : ''}`}
+        onMouseEnter={() => { hovering.current = true; }}
+        onMouseLeave={() => { hovering.current = false; endDrag(); }}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}
+        onTouchStart={() => holdAuto(3500)} onTouchEnd={() => holdAuto(2500)}
+        onWheel={() => holdAuto(2500)}
+        onClickCapture={(e) => { if (drag.current.moved) { e.preventDefault(); e.stopPropagation(); } }}>
+        <div className="flex gap-3 w-max px-1">
+          {items.map((c, i) => (
+            <button key={`${c.name}-${i}`} onClick={() => onSelect(c.name)} draggable={false}
+              className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selected === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
+              <span className="text-2xl">{c.emoji}</span>
+              <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StepCard({ step, index }) {
   const [ref, inView] = useInView(0.35);
   const Icon = STEP_ICONS[index];
@@ -235,8 +326,9 @@ html { scroll-behavior: smooth; }
 
 /* ক্যাটাগরি বার — বাম থেকে ডানে অনবরত স্ক্রল হয়। লিস্টটা দুইবার বসিয়ে
    -50% পর্যন্ত সরালেই লুপ নিরবচ্ছিন্ন দেখায় (কোনো ঝাঁকুনি বা ফাঁকা জায়গা পড়ে না)। */
-.cat-marquee-track { animation: catMarquee 26s linear infinite; }
-.cat-marquee-track:hover, .cat-marquee-track:focus-within { animation-play-state: paused; }
+.cat-scroller { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; -webkit-overflow-scrolling: touch; }
+.cat-scroller::-webkit-scrollbar { display: none; }
+.cat-scroller.is-dragging { cursor: grabbing; user-select: none; }
 
 /* "৩ ধাপে অর্ডার করুন" সেকশনের প্রতিটা ধাপ স্ক্রল করে দেখা যাওয়ার আগে অদৃশ্য থাকে (opacity: 0),
    .reveal-step-in ক্লাস যোগ হলে (useInView হুক দিয়ে) অ্যানিমেট হয়ে ভেসে ওঠে। */
@@ -3930,7 +4022,7 @@ export default function App() {
         </div>
         {/* দ্বিতীয় সারি — ডেস্কটপে মূল পেজগুলোর লিংক */}
         <nav aria-label="প্রধান মেনু" className="hidden lg:block bg-red-800/90 border-t border-white/10">
-          <div className="max-w-6xl mx-auto px-4 flex items-center gap-6 text-sm font-medium text-white/95 overflow-x-auto">
+          <div className="max-w-6xl mx-auto px-4 flex items-center gap-7 text-base font-semibold text-white/95 overflow-x-auto">
             {[
               { to: '/', label: 'হোম' },
               { to: '/products', label: 'সব পণ্য' },
@@ -3940,9 +4032,9 @@ export default function App() {
               { to: '/faq', label: 'প্রশ্নোত্তর' },
               { to: '/contact', label: 'যোগাযোগ' },
             ].map((l) => (
-              <Link key={l.to} to={l.to} className={`py-2.5 whitespace-nowrap border-b-2 transition-colors hover:text-white ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
+              <Link key={l.to} to={l.to} className={`py-3 whitespace-nowrap border-b-2 transition-colors hover:text-white ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
             ))}
-            <button onClick={goToOrders} className="py-2.5 whitespace-nowrap border-b-2 border-transparent hover:text-white ml-auto">অর্ডার ট্র্যাক</button>
+            <button onClick={goToOrders} className="py-3 whitespace-nowrap border-b-2 border-transparent hover:text-white ml-auto">অর্ডার ট্র্যাক</button>
           </div>
         </nav>
       </header>
@@ -4282,18 +4374,8 @@ export default function App() {
                 <button onClick={() => { setSelectedCategory(null); resetStorefrontPaging(); }} className="text-xs text-red-600 hover:underline transition-colors">সব দেখুন ✕</button>
               )}
             </div>
-            <div className="overflow-hidden pb-2">
-              <div className="flex gap-3 w-max cat-marquee-track">
-                {/* তালিকাটা দুইবার বসানো হয়েছে যাতে -50% পর্যন্ত সরলে লুপটা নিরবচ্ছিন্ন (seamless) দেখায় */}
-                {[...CATEGORIES, ...CATEGORIES].map((c, i) => (
-                  <button key={`${c.name}-${i}`} onClick={() => { setSelectedCategory(c.name === selectedCategory ? null : c.name); resetStorefrontPaging(); scrollToProducts(); }}
-                    className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selectedCategory === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
-                    <span className="text-2xl">{c.emoji}</span>
-                    <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <CategoryScroller categories={CATEGORIES} selected={selectedCategory}
+              onSelect={(name) => { setSelectedCategory(name === selectedCategory ? null : name); resetStorefrontPaging(); scrollToProducts(); }} />
           </section>
 
           {/* How it works */}
