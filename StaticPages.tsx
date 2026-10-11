@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ChevronRight, Phone, Mail, MapPin, Facebook, Instagram, MessageCircle, ShieldCheck,
   Truck, Wallet, Clock, Plane, Search, ChevronDown,
@@ -14,7 +14,7 @@ export function PageShell({ eyebrow, title, subtitle, crumb, children, narrow = 
   return (
     <main>
       <section className="bg-slate-50 border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
+        <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
           <nav aria-label="breadcrumb" className="text-xs text-gray-500 flex items-center gap-1.5 mb-4">
             <Link to="/" className="hover:text-red-600">হোম</Link>
             <ChevronRight className="h-3 w-3" />
@@ -25,7 +25,7 @@ export function PageShell({ eyebrow, title, subtitle, crumb, children, narrow = 
           {subtitle && <p className="text-gray-600 mt-3 max-w-2xl leading-7">{subtitle}</p>}
         </div>
       </section>
-      <div className={`${narrow ? 'max-w-4xl' : 'max-w-6xl'} mx-auto px-4 py-10 md:py-14`}>{children}</div>
+      <div className={`${narrow ? 'max-w-4xl' : 'max-w-7xl'} mx-auto px-4 py-10 md:py-14`}>{children}</div>
     </main>
   );
 }
@@ -44,7 +44,7 @@ function Note({ children, tone = 'amber' }: { children: React.ReactNode; tone?: 
 export function CtaBand({ title = 'পছন্দের পণ্য খুঁজে নিন', text = 'ক্যাটালগ থেকে বেছে নিন, অথবা ছবি দিয়ে খুঁজুন।' }: { title?: string; text?: string }) {
   return (
     <section className="bg-red-700 text-white">
-      <div className="max-w-6xl mx-auto px-4 py-10 flex flex-col md:flex-row items-center justify-between gap-5">
+      <div className="max-w-7xl mx-auto px-4 py-10 flex flex-col md:flex-row items-center justify-between gap-5">
         <div>
           <h2 className="font-display text-2xl font-extrabold">{title}</h2>
           <p className="text-red-100 text-sm mt-1">{text}</p>
@@ -121,6 +121,47 @@ export function HowItWorksPage() {
 
 /* ---------- Shipping ---------- */
 
+/* ---------- শিপিং ক্যালকুলেটর ---------- */
+
+export function ShippingCalculator({ className = '' }: { className?: string }) {
+  const [kg, setKg] = useState('1');
+  const w = Math.max(0, parseFloat(kg) || 0);
+  const cost = Math.round(w * SITE.shippingRatePerKg);
+  const bn = (n: number) => n.toLocaleString('bn-BD');
+  return (
+    <div className={`rounded-2xl border border-gray-200 bg-white p-5 md:p-6 ${className}`}>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="h-10 w-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><Wallet className="h-5 w-5" /></span>
+        <div>
+          <h2 className="font-display text-lg font-extrabold text-gray-900 leading-tight">শিপিং খরচ হিসাব করুন</h2>
+          <p className="text-xs text-gray-500">পণ্যের আনুমানিক ওজন লিখুন — চীন থেকে আপনার ঠিকানা পর্যন্ত খরচ দেখুন।</p>
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-[1fr_1fr] gap-4 items-end">
+        <div>
+          <label htmlFor="ship-kg" className="text-sm font-medium text-gray-700">ওজন (কেজি)</label>
+          <input id="ship-kg" type="number" inputMode="decimal" min="0" step="0.1" value={kg} onChange={(e) => setKg(e.target.value)}
+            className="w-full mt-1 border border-gray-300 rounded-xl p-3 text-lg font-semibold outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
+          <div className="flex flex-wrap gap-2 mt-2">
+            {['0.5', '1', '2', '5', '10'].map((v) => (
+              <button key={v} type="button" onClick={() => setKg(v)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${kg === v ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'}`}>
+                {bn(Number(v))} কেজি
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-center">
+          <p className="text-xs text-red-700">আনুমানিক শিপিং চার্জ</p>
+          <p className="font-display text-3xl font-extrabold text-red-700 mt-1">৳ {bn(cost)}</p>
+          <p className="text-[11px] text-gray-500 mt-1">হার: ৳ {bn(SITE.shippingRatePerKg)} / কেজি · ডেলিভারি ১৫–২০ দিন</p>
+        </div>
+      </div>
+      <p className="text-[11px] leading-5 text-gray-500 mt-4">এটি আনুমানিক হিসাব। পণ্য বাংলাদেশে পৌঁছানোর পর আসল ওজন মেপে চূড়ান্ত চার্জ ধরা হয়। এখানে পণ্যের দাম যুক্ত নয়।</p>
+    </div>
+  );
+}
+
 export function ShippingPage() {
   return (
     <>
@@ -139,6 +180,7 @@ export function ShippingPage() {
             </div>
           ))}
         </div>
+        <ShippingCalculator className="mb-8" />
         <Prose>
           <H2>শিপিং চার্জ কীভাবে হিসাব হয়</H2>
           <p>চীন থেকে বাংলাদেশে আপনার ঠিকানা পর্যন্ত ডেলিভারি ও শিপিং চার্জ প্রতি কেজি {SITE.shippingRatePerKg} টাকা হারে ধরা হয়। ওয়েবসাইটে পণ্যের পাশে বা কার্টে যে ওজন ও চার্জ দেখানো হয়, তা <strong>আনুমানিক</strong> — ১০০% নির্ভুল নয়।</p>
