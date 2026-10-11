@@ -329,6 +329,8 @@ html { scroll-behavior: smooth; }
 .cat-scroller { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; -webkit-overflow-scrolling: touch; }
 .cat-scroller::-webkit-scrollbar { display: none; }
 .cat-scroller.is-dragging { cursor: grabbing; user-select: none; }
+.mob-nav-strip { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+.mob-nav-strip::-webkit-scrollbar { display: none; }
 
 /* "৩ ধাপে অর্ডার করুন" সেকশনের প্রতিটা ধাপ স্ক্রল করে দেখা যাওয়ার আগে অদৃশ্য থাকে (opacity: 0),
    .reveal-step-in ক্লাস যোগ হলে (useInView হুক দিয়ে) অ্যানিমেট হয়ে ভেসে ওঠে। */
@@ -4035,6 +4037,23 @@ export default function App() {
               <Link key={l.to} to={l.to} className={`py-3 whitespace-nowrap border-b-2 transition-colors hover:text-white ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
             ))}
             <button onClick={goToOrders} className="py-3 whitespace-nowrap border-b-2 border-transparent hover:text-white ml-auto">অর্ডার ট্র্যাক</button>
+          </div>
+        </nav>
+        {/* মোবাইলে মেনু — হেডারের নিচে আঙুল দিয়ে সোয়াইপ করা সারি (ডেস্কটপে উপরের মেনু দেখায়) */}
+        <nav aria-label="মোবাইল মেনু" className="lg:hidden bg-red-800/90 border-t border-white/10">
+          <div className="mob-nav-strip flex items-center gap-1 px-3 text-sm font-semibold text-white/95">
+            {[
+              { to: '/', label: 'হোম' },
+              { to: '/products', label: 'সব পণ্য' },
+              { to: '/how-it-works', label: 'কীভাবে কাজ করে' },
+              { to: '/shipping', label: 'শিপিং ও ডেলিভারি' },
+              { to: '/about', label: 'আমাদের সম্পর্কে' },
+              { to: '/faq', label: 'প্রশ্নোত্তর' },
+              { to: '/contact', label: 'যোগাযোগ' },
+            ].map((l) => (
+              <Link key={l.to} to={l.to} className={`shrink-0 px-3 py-2.5 whitespace-nowrap border-b-2 transition-colors ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
+            ))}
+            <button onClick={goToOrders} className="shrink-0 px-3 py-2.5 whitespace-nowrap border-b-2 border-transparent">অর্ডার ট্র্যাক</button>
           </div>
         </nav>
       </header>
