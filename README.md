@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/33313624/README.md)
 # DrutoLink E-Commerce
 
 
@@ -110,3 +111,25 @@ For Vercel, the same `/api/uddoktapay/*` routes are provided by the `api/uddokta
 8. `COMPLETED` payments are saved as `paymentStatus: PAID` and the order moves to `Order Placed`.
 
 > For production, the strongest setup is to move final order authorization/amount validation and Firestore payment updates into a trusted server using Firebase Admin SDK. The current integration keeps the UddoktaPay secret server-side and is suitable for the requested Sandbox integration/testing flow.
+
+## 🧭 Pages & routes
+
+The site is a single-page app with real URLs (tiny built-in router, see `src/router.ts`; no extra package needed).
+
+| URL | Page |
+| --- | --- |
+| `/` | Home (landing) |
+| `/products` | All products — search, image search, sort, category sidebar, "আরও দেখুন" |
+| `/category/:slug` | Category page, e.g. `/category/electronics` (slugs in `src/site.ts`) |
+| `/product/:id` | Product page — gallery, size/colour, quantity, estimated shipping |
+| `/how-it-works`, `/shipping`, `/about`, `/faq`, `/contact` | Info pages |
+| `/return-policy`, `/privacy-policy`, `/terms` | Policy pages |
+| `/track-order`, `/login`, `/signup`, `/account`, `/checkout` | Customer flow |
+| `/admin`, `/worker` | Staff panels (unchanged) |
+
+**Where to edit things**
+- Phone / WhatsApp / e-mail / support hours → `src/site.ts` (`SITE`). Empty fields are simply not shown.
+- FAQ text (FAQ page + chatbot) → `FAQ_LIST` in `src/site.ts`.
+- Page text → `src/pages/StaticPages.tsx`; product listing/detail → `src/pages/StorePages.tsx`.
+- Category names must stay identical to the `category` field saved on products; add a slug for any new category in `CATEGORY_SLUGS`.
+- `public/sitemap.xml` lists the static pages and categories (product URLs are dynamic and not listed).
