@@ -143,18 +143,19 @@ export function ShippingCalculator({ className = '' }: { className?: string }) {
           <input id="ship-kg" type="number" inputMode="decimal" min="0" step="0.1" value={kg} onChange={(e) => setKg(e.target.value)}
             className="w-full mt-1 border border-gray-300 rounded-xl p-3 text-lg font-semibold outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" />
           <div className="flex flex-wrap gap-2 mt-2">
-            {['0.5', '1', '2', '5', '10'].map((v) => (
+            {['0.5', '1', '2', '3', '5', '10'].map((v) => (
               <button key={v} type="button" onClick={() => setKg(v)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${kg === v ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'}`}>
-                {bn(Number(v))} কেজি
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${Number(kg) === Number(v) ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'}`}>
+                {bn(Number(v))} কেজি · ৳ {bn(Math.round(Number(v) * SITE.shippingRatePerKg))}
               </button>
             ))}
           </div>
         </div>
         <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-center">
-          <p className="text-xs text-red-700">আনুমানিক শিপিং চার্জ</p>
+          <p className="text-xs text-red-700">{bn(w)} কেজির শিপিং চার্জ</p>
           <p className="font-display text-3xl font-extrabold text-red-700 mt-1">৳ {bn(cost)}</p>
-          <p className="text-[11px] text-gray-500 mt-1">হার: ৳ {bn(SITE.shippingRatePerKg)} / কেজি · ডেলিভারি ১৫–২০ দিন</p>
+          <p className="text-[11px] text-gray-500 mt-1">{bn(w)} কেজি × ৳ {bn(SITE.shippingRatePerKg)} = ৳ {bn(cost)}</p>
+          <p className="text-[11px] text-gray-500">নির্দিষ্ট রেট: ৳ {bn(SITE.shippingRatePerKg)} / কেজি · ডেলিভারি ১৫–২০ দিন</p>
         </div>
       </div>
       <p className="text-[11px] leading-5 text-gray-500 mt-4">এটি আনুমানিক হিসাব। পণ্য বাংলাদেশে পৌঁছানোর পর আসল ওজন মেপে চূড়ান্ত চার্জ ধরা হয়। এখানে পণ্যের দাম যুক্ত নয়।</p>
@@ -170,7 +171,7 @@ export function ShippingPage() {
         <div className="grid sm:grid-cols-3 gap-4 mb-8">
           {[
             { icon: Clock, t: 'আনুমানিক সময়', v: '১৫–২০ দিন' },
-            { icon: Wallet, t: 'শিপিং চার্জ (আনুমানিক)', v: `৳ ${SITE.shippingRatePerKg.toLocaleString('bn-BD')} / কেজি` },
+            { icon: Wallet, t: 'শিপিং চার্জ (নির্দিষ্ট রেট)', v: `৳ ${SITE.shippingRatePerKg.toLocaleString('bn-BD')} / কেজি` },
             { icon: Plane, t: 'শিপমেন্ট মাধ্যম', v: 'এয়ার শিপমেন্ট' },
           ].map(({ icon: Icon, t, v }) => (
             <div key={t} className="rounded-2xl border border-gray-200 bg-white p-5">
