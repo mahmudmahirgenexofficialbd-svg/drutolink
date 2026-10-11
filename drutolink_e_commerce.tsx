@@ -13,7 +13,7 @@ import {
   CheckCircle, Upload, ArrowLeft, Lock, Key, Trash2, Plus, Minus, LogOut, X,
   Eye, EyeOff, Phone as PhoneIcon, Mail, Circle, MapPin, Users, UserPlus, Pencil,
   Camera, Loader2, TrendingUp, Clock, AlertTriangle, BarChart3, Banknote, Award,
-  Copy, Check, MessageCircle, Facebook, Instagram
+  Copy, Check, MessageCircle, Facebook, Instagram, Home as HomeIcon
 } from 'lucide-react';
 import { db, auth, secondaryAuth } from './firebase';
 import { useVisualSearch } from './visualSearch';
@@ -22,7 +22,7 @@ import { navigate, parsePath, buildPath, applyMeta } from './router';
 import { SITE, FAQ_LIST, slugToCategory, categoryPath, pageMeta } from './site';
 import {
   AboutPage, HowItWorksPage, ShippingPage, ReturnPolicyPage, PrivacyPage, TermsPage,
-  ContactPage, FaqPage, NotFoundPage,
+  ContactPage, FaqPage, NotFoundPage, ShippingCalculator,
 } from './StaticPages';
 import { ProductsPage, ProductPage } from './StorePages';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -92,6 +92,18 @@ function getEstimatedWeightKg(product) {
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
   return Number(CATEGORY_WEIGHT_ESTIMATES[product?.category] || 0.50);
 }
+
+const ORDER_STAGE_BN = {
+  'Payment Pending': 'পেমেন্ট বাকি',
+  'Pending TrxID': 'TrxID যাচাই চলছে',
+  'Order Placed': 'অর্ডার প্লেসড',
+  'Processing': 'প্রসেসিং',
+  'Sourced in China': 'চীনে সংগ্রহ হয়েছে',
+  'In Transit': 'ট্রানজিটে',
+  'Arrived in Bangladesh': 'বাংলাদেশে পৌঁছেছে',
+  'Out for Delivery': 'ডেলিভারির জন্য বের হয়েছে',
+  'Delivered': 'ডেলিভারড',
+};
 
 const ORDER_STAGES = [
   'Payment Pending',
@@ -248,8 +260,8 @@ function CategoryScroller({ categories, selected, onSelect }) {
           {items.map((c, i) => (
             <button key={`${c.name}-${i}`} onClick={() => onSelect(c.name)} draggable={false}
               className={`shrink-0 flex flex-col items-center gap-2 border rounded-xl px-5 py-4 min-w-[110px] transition-all duration-200 hover:-translate-y-0.5 ${selected === c.name ? 'bg-red-50 border-red-400 ring-1 ring-red-400 shadow-sm' : 'bg-gray-50 hover:bg-red-50 border-gray-200 hover:border-red-300 hover:shadow-sm'}`}>
-              <span className="text-2xl">{c.emoji}</span>
-              <span className="text-xs font-medium text-gray-700 text-center leading-tight">{c.name}</span>
+              <span className="h-12 w-12 rounded-full bg-red-50 flex items-center justify-center text-2xl">{c.emoji}</span>
+              <span className="text-[13px] font-medium text-gray-700 text-center leading-tight">{c.name}</span>
             </button>
           ))}
         </div>
@@ -832,7 +844,28 @@ function OrderStatusTimeline({ status }) {
   return (
     <div className="w-full">
       <AnimatedTrackingViz status={status} />
-      <div className="overflow-x-auto pb-4 thin-scroll">
+      {/* মোবাইলে উল্লম্ব টাইমলাইন */}
+      <ol className="sm:hidden mt-2 ml-1">
+        {ORDER_STAGES.map((stage, i) => {
+          const done = i < currentIndex;
+          const active = i === currentIndex;
+          return (
+            <li key={stage} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span className={`h-7 w-7 rounded-full flex items-center justify-center border-2 shrink-0 ${
+                  done ? 'bg-red-600 border-red-600 text-white'
+                  : active ? 'border-red-600 text-red-600 bg-red-50 ring-4 ring-red-100'
+                  : 'border-gray-200 text-gray-300 bg-white'}`}>
+                  {done ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-2.5 w-2.5 fill-current" />}
+                </span>
+                {i < ORDER_STAGES.length - 1 && <span className={`w-0.5 flex-1 min-h-[22px] ${i < currentIndex ? 'bg-red-600' : 'bg-gray-200'}`} />}
+              </div>
+              <p className={`pb-4 pt-1 text-sm ${active ? 'text-red-700 font-bold' : done ? 'text-gray-700' : 'text-gray-400'}`}>{ORDER_STAGE_BN[stage] || stage}</p>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="hidden sm:block overflow-x-auto pb-4 thin-scroll">
         <div className="min-w-[720px] flex items-center w-full px-2">
           {ORDER_STAGES.map((stage, i) => {
             const done = i < currentIndex;
@@ -847,8 +880,8 @@ function OrderStatusTimeline({ status }) {
                   }`}>
                     {done ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-3 w-3 fill-current" />}
                   </div>
-                  <span className={`mt-2 text-[10px] leading-tight ${active ? 'text-red-700 font-bold' : done ? 'text-gray-700' : 'text-gray-400'}`}>
-                    {stage}
+                  <span className={`mt-2 text-[11px] leading-tight ${active ? 'text-red-700 font-bold' : done ? 'text-gray-700' : 'text-gray-400'}`}>
+                    {ORDER_STAGE_BN[stage] || stage}
                   </span>
                 </div>
                 {i < ORDER_STAGES.length - 1 && (
@@ -902,13 +935,13 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
           <button type="button" onClick={() => onGoogleLogin()} disabled={authLoading}
             className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-60">
             <svg className="h-4 w-4" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6 29.5 4 24 4c-7.5 0-14 4.2-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-1.8 14.1-5l-6.5-5.5C29.5 35.4 26.9 36 24 36c-5.3 0-9.7-3.4-11.3-8l-6.6 5C9.9 39.7 16.4 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.5 5.5C40.8 36.3 44 30.8 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
-            Sign in with Google
+            গুগল দিয়ে {isSignup ? 'সাইন আপ' : 'সাইন ইন'} করুন
           </button>
         </div>
 
         <div className="flex items-center gap-3 my-5">
           <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400">or</span>
+          <span className="text-xs text-gray-400">অথবা</span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
@@ -926,27 +959,27 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
             <div className="flex gap-4 text-sm font-medium border-b border-gray-100">
               <button type="button" onClick={() => setLoginMethod('email')}
                 className={`pb-2 -mb-px border-b-2 ${loginMethod === 'email' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-400'}`}>
-                Email Address
+                ইমেইল
               </button>
               <button type="button" onClick={() => setLoginMethod('phone')}
                 className={`pb-2 -mb-px border-b-2 ${loginMethod === 'phone' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-400'}`}>
-                Phone Number
+                ফোন নম্বর
               </button>
             </div>
           )}
 
           {(isSignup || loginMethod === 'email') && (
             <div>
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Email Address</label>
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> ইমেইল</label>
               <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                placeholder="আপনার ইমেইল লিখুন"
                 className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
             </div>
           )}
 
           {!isSignup && loginMethod === 'phone' && (
             <div>
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><PhoneIcon className="h-3.5 w-3.5" /> Phone Number</label>
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1"><PhoneIcon className="h-3.5 w-3.5" /> ফোন নম্বর</label>
               <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
                 placeholder="01xxxxxxxxx"
                 className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" />
@@ -964,7 +997,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
           )}
 
           <div>
-            <label className="text-sm font-medium text-gray-700">Password</label>
+            <label className="text-sm font-medium text-gray-700">পাসওয়ার্ড</label>
             <div className="relative mt-1">
               <input type={showPassword ? 'text' : 'password'} required minLength={6} value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -980,7 +1013,7 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-gray-600">
                 <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-                Remember me
+                আমাকে মনে রাখুন
               </label>
             </div>
           )}
@@ -989,15 +1022,15 @@ function AuthPage({ mode, setMode, onLogin, onSignup, onGoogleLogin, authError, 
 
           <button type="submit" disabled={authLoading}
             className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-red-600/20 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100">
-            {authLoading ? 'অপেক্ষা করুন...' : isSignup ? 'Sign up' : 'Sign in'}
+            {authLoading ? 'অপেক্ষা করুন...' : isSignup ? 'অ্যাকাউন্ট তৈরি করুন' : 'সাইন ইন'}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-5">
           {isSignup ? (
-            <>Already have an account? <button onClick={() => setMode('login')} className="text-red-700 font-semibold hover:underline">Sign in</button></>
+            <>আগে থেকেই অ্যাকাউন্ট আছে? <button onClick={() => setMode('login')} className="text-red-700 font-semibold hover:underline">সাইন ইন করুন</button></>
           ) : (
-            <>New here? <button onClick={() => setMode('signup')} className="text-red-700 font-semibold hover:underline">Sign up</button></>
+            <>নতুন? <button onClick={() => setMode('signup')} className="text-red-700 font-semibold hover:underline">অ্যাকাউন্ট খুলুন</button></>
           )}
         </p>
 
@@ -2650,7 +2683,7 @@ function FAQChatbot() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-body">
+    <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 font-body">
       {isOpen ? (
         <div className="bg-white rounded-2xl shadow-2xl w-[320px] sm:w-[350px] border border-gray-100 flex flex-col h-[450px] overflow-hidden animate-scale-in origin-bottom-right">
           <div className="bg-red-600 text-white p-4 flex items-center justify-between">
@@ -2714,7 +2747,7 @@ function SiteFooter() {
   );
   return (
     <footer className="bg-slate-950 text-slate-300">
-      <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-8">
+      <div className="max-w-7xl mx-auto px-4 py-12 grid md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-8">
         <div>
           <Link to="/" className="flex items-center gap-2 font-display text-xl font-extrabold text-white">
             <img src={LOGO_URL} alt="DrutoLink" className="h-9 w-9 object-contain rounded-lg" />
@@ -2743,7 +2776,7 @@ function SiteFooter() {
         ])}
       </div>
       <div className="border-t border-white/10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row gap-2 items-center justify-between text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row gap-2 items-center justify-between text-xs text-slate-500">
           <span>© ২০২৬ DrutoLink. সর্বস্বত্ব সংরক্ষিত।</span>
           <span>বিকাশ ও নগদ পেমেন্ট সুবিধা</span>
         </div>
@@ -2756,7 +2789,7 @@ function AboutSection() {
   return (
     <section className="bg-white py-16 lg:py-24 border-t border-gray-100 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-1/2 h-full bg-slate-50/50 -skew-x-12 transform origin-top hidden lg:block" />
-      <div className="max-w-6xl mx-auto px-4 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-red-50 border border-red-100 px-3 py-1.5 text-xs font-bold text-red-700 mb-6 shadow-sm">
@@ -3976,15 +4009,23 @@ export default function App() {
       )}
 
       {/* Header */}
+      <div className="bg-gray-900 text-white/90 text-[11px] sm:text-xs">
+        <div className="max-w-7xl mx-auto px-4 py-1.5 flex flex-wrap items-center justify-center gap-x-5 gap-y-0.5 text-center">
+          <span>ডেলিভারি ১৫–২০ দিন</span>
+          <span>শিপিং ৳{SITE.shippingRatePerKg.toLocaleString('bn-BD')}/কেজি (আনুমানিক)</span>
+          <span>অর্ডার কনফার্মে ৫০% অ্যাডভান্স</span>
+          <Link to="/shipping" className="underline underline-offset-2 hover:text-white">বিস্তারিত</Link>
+        </div>
+      </div>
       <header className="bg-red-700 text-white sticky top-0 z-40 shadow-md shadow-red-900/10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 py-2 md:py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <button onClick={() => setMobileNavOpen(true)} className="lg:hidden text-white p-1 -ml-1 transition-opacity hover:opacity-80" aria-label="মেনু খুলুন">
               <Menu className="h-6 w-6" />
             </button>
             <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setCurrentView('home')}>
-              <img src={LOGO_URL} alt="DrutoLink" className="h-10 w-10 object-contain rounded-lg transition-transform duration-200 group-hover:scale-105" />
-              <span className="font-display text-2xl font-extrabold tracking-tight text-white">
+              <img src={LOGO_URL} alt="DrutoLink" className="h-8 w-8 md:h-10 md:w-10 object-contain rounded-lg transition-transform duration-200 group-hover:scale-105" />
+              <span className="font-display text-xl md:text-2xl font-extrabold tracking-tight text-white">
                 Druto<span className="font-medium text-red-100">Link</span>
               </span>
             </div>
@@ -4024,7 +4065,7 @@ export default function App() {
         </div>
         {/* দ্বিতীয় সারি — ডেস্কটপে মূল পেজগুলোর লিংক */}
         <nav aria-label="প্রধান মেনু" className="hidden lg:block bg-red-800/90 border-t border-white/10">
-          <div className="max-w-6xl mx-auto px-4 flex items-center gap-7 text-base font-semibold text-white/95 overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 flex items-center gap-7 text-base font-semibold text-white/95 overflow-x-auto">
             {[
               { to: '/', label: 'হোম' },
               { to: '/products', label: 'সব পণ্য' },
@@ -4041,7 +4082,7 @@ export default function App() {
         </nav>
         {/* মোবাইলে মেনু — হেডারের নিচে আঙুল দিয়ে সোয়াইপ করা সারি (ডেস্কটপে উপরের মেনু দেখায়) */}
         <nav aria-label="মোবাইল মেনু" className="lg:hidden bg-red-800/90 border-t border-white/10">
-          <div className="mob-nav-strip flex items-center gap-1 px-3 text-sm font-semibold text-white/95">
+          <div className="mob-nav-strip flex items-center gap-0.5 px-2 text-sm font-semibold text-white/95">
             {[
               { to: '/', label: 'হোম' },
               { to: '/products', label: 'সব পণ্য' },
@@ -4051,9 +4092,9 @@ export default function App() {
               { to: '/faq', label: 'প্রশ্নোত্তর' },
               { to: '/contact', label: 'যোগাযোগ' },
             ].map((l) => (
-              <Link key={l.to} to={l.to} className={`shrink-0 px-3 py-2.5 whitespace-nowrap border-b-2 transition-colors ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
+              <Link key={l.to} to={l.to} className={`shrink-0 px-3 py-2 whitespace-nowrap border-b-2 transition-colors ${((l.to === '/' && currentView === 'home') || (l.to !== '/' && typeof window !== 'undefined' && window.location.pathname.startsWith(l.to))) ? 'border-white text-white' : 'border-transparent'}`}>{l.label}</Link>
             ))}
-            <button onClick={goToOrders} className="shrink-0 px-3 py-2.5 whitespace-nowrap border-b-2 border-transparent">অর্ডার ট্র্যাক</button>
+            <button onClick={goToOrders} className="shrink-0 px-3 py-2 whitespace-nowrap border-b-2 border-transparent">অর্ডার ট্র্যাক</button>
           </div>
         </nav>
       </header>
@@ -4286,7 +4327,7 @@ export default function App() {
           <section className="relative overflow-hidden bg-slate-50 border-b border-gray-200">
             <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-100/70 blur-3xl hero-glow" />
             <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-slate-200/70 blur-3xl" />
-            <div className="relative max-w-6xl mx-auto px-4 py-10 md:py-14 lg:py-16 grid lg:grid-cols-[1.05fr_.95fr] gap-10 items-center">
+            <div className="relative max-w-7xl mx-auto px-4 py-10 md:py-14 lg:py-16 grid lg:grid-cols-[1.05fr_.95fr] gap-10 items-center">
               <motion.div 
                 initial={{ opacity: 0, x: -30 }} 
                 animate={{ opacity: 1, x: 0 }} 
@@ -4345,13 +4386,13 @@ export default function App() {
           </section>
 
           {/* Image Slider Section */}
-          <section className="max-w-6xl mx-auto px-4 py-8">
+          <section className="max-w-7xl mx-auto px-4 py-8">
             <ImageSlider />
           </section>
 
           {/* Quick service actions */}
           <section className="bg-white border-b border-gray-100">
-            <div className="max-w-6xl mx-auto px-4 py-6 md:py-7 grid md:grid-cols-3 gap-3">
+            <div className="max-w-7xl mx-auto px-4 py-6 md:py-7 grid md:grid-cols-3 gap-3">
               {[
                 { icon: Search, title: 'পণ্য খুঁজুন', desc: 'ক্যাটালগ থেকে আপনার পছন্দের পণ্য বেছে নিন।', action: scrollToProducts },
                 { icon: Camera, title: 'ছবি দিয়ে খুঁজুন', desc: 'ছবি আপলোড করে মিল থাকা পণ্য দেখুন।', action: openImageSearch },
@@ -4368,7 +4409,7 @@ export default function App() {
 
           {/* Trust strip */}
           <section className="bg-white border-b border-gray-200">
-            <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {[
                 { icon: Package, label: '৫,০০০+ পণ্যের ক্যাটালগ' },
                 { icon: ShieldCheck, label: 'ভেরিফায়েড সাপ্লায়ার' },
@@ -4386,7 +4427,7 @@ export default function App() {
           </section>
 
           {/* Categories */}
-          <section className="max-w-6xl mx-auto px-4 py-10">
+          <section className="max-w-7xl mx-auto px-4 py-10">
             <div className="flex items-center justify-between mb-4">
               <div><p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">Explore</p><h2 className="font-display text-2xl font-extrabold text-gray-900">ক্যাটাগরি থেকে পণ্য খুঁজুন</h2></div>
               {selectedCategory && (
@@ -4397,9 +4438,14 @@ export default function App() {
               onSelect={(name) => { setSelectedCategory(name === selectedCategory ? null : name); resetStorefrontPaging(); scrollToProducts(); }} />
           </section>
 
+          {/* শিপিং ক্যালকুলেটর */}
+          <section className="max-w-7xl mx-auto px-4 pb-10">
+            <ShippingCalculator />
+          </section>
+
           {/* How it works */}
           <section ref={howItWorksRef} className="bg-red-700 text-white">
-            <div className="max-w-6xl mx-auto px-4 py-14">
+            <div className="max-w-7xl mx-auto px-4 py-14">
               <p className="text-red-100 text-xs font-bold uppercase tracking-wider mb-2">Simple process</p>
               <h2 className="font-display text-2xl md:text-3xl font-extrabold mb-3">মাত্র ৩ ধাপে অর্ডার করুন</h2>
               <p className="text-red-100 text-sm md:text-base mb-9">পণ্য নির্বাচন থেকে ডেলিভারি—প্রক্রিয়াটি সহজ রাখাই DrutoLink-এর লক্ষ্য।</p>
@@ -4414,7 +4460,7 @@ export default function App() {
           </section>
 
           {/* Product grid */}
-          <section ref={productsRef} className="max-w-6xl mx-auto px-4 py-12">
+          <section ref={productsRef} className="max-w-7xl mx-auto px-4 py-12">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="font-display text-xl font-bold text-gray-900">
                 {visual.active ? 'ছবির সাথে মিলে যাওয়া পণ্য' : (selectedCategory ? selectedCategory : 'জনপ্রিয় পণ্য')}
@@ -4462,7 +4508,7 @@ export default function App() {
                 </p>
               )
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
                 {visibleProducts.map((p, index) => {
                   const hasVariants = (p.sizes && p.sizes.length > 0) || (p.colors && p.colors.length > 0);
                   return (
@@ -4475,7 +4521,7 @@ export default function App() {
                       className="group bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/70 hover:-translate-y-1 hover:border-gray-300"
                     >
                       <button onClick={() => setDetailProduct(p)} className="block overflow-hidden relative w-full">
-                        <img src={p.image} alt={p.title} className="h-40 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
+                        <img src={p.image} alt={p.title} className="h-40 sm:h-44 w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
                         {p._matchScore != null && (
                           <span className="absolute top-2 left-2 bg-black/65 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
                             {Math.round(p._matchScore * 100)}% মিল
@@ -4484,7 +4530,7 @@ export default function App() {
                       </button>
                       <div className="p-3.5 flex flex-col flex-1">
                         <button onClick={() => setDetailProduct(p)} className="text-left">
-                          <h3 className="text-sm font-semibold text-gray-800 leading-snug transition-colors group-hover:text-red-700">{p.title}</h3>
+                          <h3 className="text-[13px] sm:text-sm font-medium text-gray-700 leading-snug line-clamp-2 min-h-[2.5rem] transition-colors group-hover:text-red-700">{p.title}</h3>
                         </button>
                         {hasVariants && (
                           <p className="text-[11px] text-gray-400 mt-1">
@@ -4493,12 +4539,12 @@ export default function App() {
                             {p.colors?.length ? `${p.colors.length} কালার` : ''}
                           </p>
                         )}
-                        <div className="mt-auto pt-3 flex items-center justify-between gap-2">
-                          <span className="font-display text-red-700 font-bold">৳ {p.price}</span>
+                        <div className="mt-auto pt-3 flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+                          <span className="font-display text-red-700 font-bold text-base whitespace-nowrap"><span className="text-xs font-semibold mr-0.5">৳</span>{p.price}</span>
                           <motion.button
                             whileTap={{ scale: 0.95 }}
                             onClick={() => hasVariants ? setDetailProduct(p) : handleAddToCart(p)}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 hover:shadow-md hover:shadow-red-600/25">
+                            className="w-full min-[420px]:w-auto whitespace-nowrap bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all duration-150 hover:shadow-md hover:shadow-red-600/25">
                             {hasVariants ? 'অপশন বাছাই' : 'কার্টে যোগ করুন'}
                           </motion.button>
                         </div>
@@ -4531,6 +4577,30 @@ export default function App() {
           <AboutSection />
 
           <SiteFooter />
+        </>
+      )}
+      {currentView !== 'checkout' && currentView !== 'admin' && currentView !== 'worker' && (
+        <>
+          <div className="h-16 lg:hidden" aria-hidden="true" />
+          <nav aria-label="নিচের মেনু" className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            <div className="grid grid-cols-4 text-[11px] font-medium text-gray-500">
+              <Link to="/" className={`flex flex-col items-center gap-0.5 py-2 ${currentView === 'home' ? 'text-red-700' : ''}`}>
+                <HomeIcon className="h-5 w-5" />হোম
+              </Link>
+              <Link to="/products" className={`flex flex-col items-center gap-0.5 py-2 ${(currentView === 'products' || currentView === 'category') ? 'text-red-700' : ''}`}>
+                <Search className="h-5 w-5" />সার্চ
+              </Link>
+              <button onClick={() => setIsCartOpen(true)} className="relative flex flex-col items-center gap-0.5 py-2">
+                <span className="relative">
+                  <ShoppingCart className="h-5 w-5" />
+                  {cartCount > 0 && <span className="absolute -top-2 -right-3 bg-red-600 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">{cartCount}</span>}
+                </span>কার্ট
+              </button>
+              <button onClick={() => { if (isCustomerLoggedIn) setCurrentView('account'); else { setRedirectAfterLogin('home'); setCurrentView('login'); } }} className="flex flex-col items-center gap-0.5 py-2">
+                <User className="h-5 w-5" />{isCustomerLoggedIn ? 'অ্যাকাউন্ট' : 'লগ ইন'}
+              </button>
+            </div>
+          </nav>
         </>
       )}
       {currentView !== 'admin' && currentView !== 'worker' && <FAQChatbot />}
