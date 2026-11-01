@@ -1,3 +1,44 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ==========================================================
+   Full-width layout (Kamae-style)
+   আগে সব সেকশন max-w-7xl (১২৮০px) এ আটকানো ছিল, তাই বড় স্ক্রিনে
+   দুই পাশে সাদা ফাঁকা পড়ত। নিচের নিয়মগুলো শুধু বড় স্ক্রিনে কনটেন্ট
+   চওড়া করে; মোবাইল/ট্যাবলেটে আগের মতোই থাকে।
+   ========================================================== */
+
+/* মোবাইলে যেন পাশে স্ক্রল/ফাঁক না আসে */
+html, body { max-width: 100%; overflow-x: clip; }
+img, video { max-width: 100%; }
+
+/* ল্যাপটপ: একটু বেশি সাইড-প্যাডিং */
+@media (min-width: 1024px) {
+  .max-w-7xl.mx-auto { padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+
+/* ডেস্কটপ ও বড় মনিটর: কনটেন্টের সর্বোচ্চ প্রস্থ ১৯২০px, প্রায় পুরো পেজ */
+@media (min-width: 1280px) {
+  .max-w-7xl.mx-auto {
+    max-width: 1920px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* বড় মনিটর: হোম পেজের প্রোডাক্ট গ্রিডে ৫ → ৬ কলাম */
+@media (min-width: 1536px) {
+  .xl\:grid-cols-5 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+  /* সব পণ্য/ক্যাটাগরি পেজ: সাইডবার একটু চওড়া, গ্রিডে ৪ → ৫ কলাম */
+  .lg\:grid-cols-\[230px_1fr\] { grid-template-columns: 260px 1fr; }
+  .lg\:grid-cols-\[230px_1fr\] .xl\:grid-cols-4 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* অতি বড় মনিটর (২৫৬০px+): ৬ → ৭ কলাম */
+@media (min-width: 2200px) {
+  .xl\:grid-cols-5 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
