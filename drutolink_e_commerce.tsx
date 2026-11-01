@@ -4062,7 +4062,7 @@ export default function App() {
               </span>
             </div>
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="hidden md:flex flex-1 max-w-xl relative">
+          <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="hidden md:flex flex-1 max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto relative">
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2.5 pl-4 pr-20 text-gray-900 bg-white outline-none ring-0 focus:ring-2 focus:ring-red-300 transition-shadow duration-150" />
             {/* ছবি দিয়ে সার্চ — ক্যামেরা আইকন */}
@@ -4094,6 +4094,20 @@ export default function App() {
               <span className="text-xs mt-0.5">কার্ট</span>
             </div>
           </div>
+        </div>
+        {/* মোবাইলে সার্চ বার — হেডারের নিচে পুরো প্রস্থে */}
+        <div className="md:hidden px-3 pb-2.5">
+          <form onSubmit={(e) => { e.preventDefault(); scrollToProducts(); }} className="relative w-full">
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="প্রোডাক্ট খুঁজুন..." className="w-full rounded-full py-2.5 pl-4 pr-20 text-sm text-gray-900 bg-white outline-none ring-0 focus:ring-2 focus:ring-red-300" />
+            <button type="button" onClick={openImageSearch} title="ছবি দিয়ে খুঁজুন"
+              className="absolute right-11 top-1.5 text-gray-400 hover:text-red-600 p-1.5 rounded-full">
+              {visual.searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </button>
+            <button type="submit" className="absolute right-1.5 top-1.5 bg-red-600 text-white p-1.5 rounded-full">
+              <Search className="h-4 w-4" />
+            </button>
+          </form>
         </div>
         {/* দ্বিতীয় সারি — ডেস্কটপে মূল পেজগুলোর লিংক */}
         <nav aria-label="প্রধান মেনু" className="hidden lg:block bg-red-800/90 border-t border-white/10">
