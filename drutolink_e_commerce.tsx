@@ -27,7 +27,7 @@ import {
   ContactPage, FaqPage, NotFoundPage, ShippingCalculator,
 } from './StaticPages';
 import { ProductsPage, ProductPage } from './StorePages';
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform, useSpring, useMotionValue, useMotionTemplate } from 'framer-motion';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, limit,
   serverTimestamp, updateDoc, setDoc, getDoc, runTransaction,
@@ -410,6 +410,69 @@ function Reveal({ children, delay = 0, className = '' }) {
       transition={{ duration: 0.85, delay, ease: [0.16, 1, 0.3, 1] }}>
       {children}
     </motion.div>
+  );
+}
+
+function TiltCard({ children, className = '', max = 9 }) {
+  const rx = useMotionValue(0), ry = useMotionValue(0);
+  const sx = useSpring(rx, { stiffness: 150, damping: 18 }), sy = useSpring(ry, { stiffness: 150, damping: 18 });
+  const gx = useMotionValue(50), gy = useMotionValue(50);
+  const glare = useMotionTemplate`radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,.6), transparent 55%)`;
+  const onMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    ry.set((px - 0.5) * max * 2); rx.set((0.5 - py) * max * 2); gx.set(px * 100); gy.set(py * 100);
+  };
+  const reset = () => { rx.set(0); ry.set(0); gx.set(50); gy.set(50); };
+  return (
+    <motion.div onMouseMove={onMove} onMouseLeave={reset} style={{ rotateX: sx, rotateY: sy, transformPerspective: 900 }} className={className}>
+      {children}
+      <motion.div style={{ backgroundImage: glare }} className="pointer-events-none absolute inset-0 rounded-[2rem] mix-blend-soft-light" />
+    </motion.div>
+  );
+}
+function Magnetic({ children }) {
+  const x = useMotionValue(0), y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 220, damping: 14, mass: 0.3 }), sy = useSpring(y, { stiffness: 220, damping: 14, mass: 0.3 });
+  const onMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    x.set((e.clientX - (r.left + r.width / 2)) * 0.3); y.set((e.clientY - (r.top + r.height / 2)) * 0.3);
+  };
+  return <motion.div className="inline-block" style={{ x: sx, y: sy }} onMouseMove={onMove} onMouseLeave={() => { x.set(0); y.set(0); }}>{children}</motion.div>;
+}
+function HeroSpotlight() {
+  const ref = useRef(null);
+  const x = useMotionValue(-500), y = useMotionValue(-500);
+  const bg = useMotionTemplate`radial-gradient(420px circle at ${x}px ${y}px, rgba(220,38,38,.12), transparent 70%)`;
+  useEffect(() => {
+    const parent = ref.current && ref.current.parentElement;
+    if (!parent) return;
+    const move = (e) => { const r = parent.getBoundingClientRect(); x.set(e.clientX - r.left); y.set(e.clientY - r.top); };
+    parent.addEventListener('pointermove', move);
+    return () => parent.removeEventListener('pointermove', move);
+  }, []);
+  return <motion.div ref={ref} style={{ background: bg }} className="pointer-events-none absolute inset-0 hidden md:block" />;
+}
+function IntroCurtain() {
+  const [show, setShow] = useState(() => { try { return !sessionStorage.getItem('dl_intro'); } catch { return false; } });
+  useEffect(() => {
+    if (!show) return;
+    try { sessionStorage.setItem('dl_intro', '1'); } catch {}
+    const t = setTimeout(() => setShow(false), 1300);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div key="curtain" className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center"
+          exit={{ y: '-100%' }} transition={{ duration: 0.9, ease: [0.76, 0, 0.24, 1] }}>
+          <motion.img src={logoAsset} alt="DrutoLink" className="h-16 w-auto" initial={{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} />
+          <div className="mt-6 h-[3px] w-40 rounded-full bg-gray-100 overflow-hidden">
+            <motion.div className="h-full bg-red-600" initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 1.1, ease: 'easeInOut' }} />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -4381,10 +4444,12 @@ export default function App() {
         </>
       ) : (
         <>
+          <IntroCurtain />
           <ScrollProgress />
           {/* Homepage 2.0 — premium hero */}
           <section className="relative overflow-hidden bg-slate-50 border-b border-gray-200">
             <div className="absolute inset-0 hero-aurora" />
+            <HeroSpotlight />
             <ParallaxBlob speed={140} className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-100/70 blur-3xl hero-glow" />
             <ParallaxBlob speed={-60} className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-slate-200/70 blur-3xl" />
             <div className="relative max-w-7xl mx-auto px-4 py-6 md:py-8 lg:py-10 grid lg:grid-cols-[1.05fr_.95fr] gap-6 lg:gap-10 items-center">
@@ -4405,12 +4470,12 @@ export default function App() {
                   পণ্য খুঁজুন, অর্ডার দিন—চীন থেকে সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির পুরো প্রক্রিয়া এক জায়গায়।
                 </p>
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
-                  <button onClick={scrollToProducts} className="btn-shine bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3.5 rounded-xl transition-all duration-200 hover:shadow-xl hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
+                  <Magnetic><button onClick={scrollToProducts} className="btn-shine bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3.5 rounded-xl transition-all duration-200 hover:shadow-xl hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
                     পণ্য খুঁজুন <ChevronRight className="inline-block h-4 w-4 ml-1" />
-                  </button>
-                  <button onClick={openImageSearch} className="bg-white border border-gray-300 hover:border-red-300 hover:bg-red-50/50 text-gray-800 font-bold px-6 py-3.5 rounded-xl transition-all duration-200">
+                  </button></Magnetic>
+                  <Magnetic><button onClick={openImageSearch} className="bg-white border border-gray-300 hover:border-red-300 hover:bg-red-50/50 text-gray-800 font-bold px-6 py-3.5 rounded-xl transition-all duration-200">
                     <Camera className="inline-block h-4 w-4 mr-2 text-red-600" /> ছবি দিয়ে খুঁজুন
-                  </button>
+                  </button></Magnetic>
                 </div>
                 <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs md:text-sm text-gray-600">
                   <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-600" /> বিকাশ ও নগদ</span>
@@ -4426,7 +4491,7 @@ export default function App() {
                 className="relative animate-hero-in-delay"
               >
                 <div className="absolute -inset-4 rounded-[2rem] bg-red-100/60 blur-2xl" />
-                <div className="relative animate-float bg-white rounded-[2rem] border border-gray-200 p-5 md:p-7 shadow-xl shadow-slate-200/70">
+                <TiltCard className="relative bg-white rounded-[2rem] border border-gray-200 p-5 md:p-7 shadow-xl shadow-slate-200/70">
                   <div className="flex items-center justify-between mb-5">
                     <div><p className="text-xs text-gray-500">DrutoLink delivery route</p><p className="font-display font-bold text-lg text-gray-900">চীন → বাংলাদেশ</p></div>
                     <span className="h-10 w-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center"><Package className="h-5 w-5" /></span>
@@ -4441,7 +4506,7 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                </div>
+                </TiltCard>
               </motion.div>
             </div>
           </section>
