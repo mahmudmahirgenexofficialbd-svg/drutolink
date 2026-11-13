@@ -1443,6 +1443,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
   const [estimatedWeightKg, setEstimatedWeightKg] = useState('');
   const [image, setImage] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].name);
+  const [featured, setFeatured] = useState(false); // Best Seller / Featured ফ্ল্যাগ
   const [saving, setSaving] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null); // null হলে নতুন প্রোডাক্ট যোগ হচ্ছে, id থাকলে ঐ প্রোডাক্ট এডিট হচ্ছে
 
@@ -1498,6 +1499,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
         image: image || 'productPlaceholderAsset',
         sizes,
         colors,
+        featured: !!featured,
       };
       if (editingProductId) {
         await updateDoc(doc(db, 'products', editingProductId), data);
@@ -1512,7 +1514,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
         alert('প্রোডাক্ট সফলভাবে যোগ হয়েছে!');
       }
       setEditingProductId(null);
-      setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage(''); setCategory(CATEGORIES[0].name);
+      setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage(''); setCategory(CATEGORIES[0].name); setFeatured(false);
       setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
       setActiveTab('orders');
     } catch (err) {
@@ -1530,6 +1532,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
     setEstimatedWeightKg(p.estimatedWeightKg || '');
     setImage(p.image || '');
     setCategory(p.category || CATEGORIES[0].name);
+    setFeatured(!!p.featured);
     setSizes(p.sizes || []);
     setColors(p.colors || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1537,7 +1540,7 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
 
   const handleCancelEditProduct = () => {
     setEditingProductId(null);
-    setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage(''); setCategory(CATEGORIES[0].name);
+    setTitle(''); setPrice(''); setEstimatedWeightKg(''); setImage(''); setCategory(CATEGORIES[0].name); setFeatured(false);
     setSizes([]); setColors([]); setSizeInput(''); setColorNameInput('');
   };
 
@@ -1791,6 +1794,10 @@ function AdminDashboard({ goHome, handleLogout, products, orders, workers, handl
                       className="w-full border rounded-lg p-2.5 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-colors duration-150" placeholder="যেমনঃ 0.50" />
                     <p className="text-[11px] text-gray-400 mt-1">কার্টের আনুমানিক Shipping Charge হিসাবের জন্য ব্যবহার হবে।</p>
                   </div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                    <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} className="w-4 h-4 accent-red-600" />
+                    ⭐ Best Seller / Featured (হোমপেজে সবার আগে দেখাবে)
+                  </label>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">পিসি থেকে ছবি আপলোড করুন</label>
                     <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
@@ -2991,42 +2998,77 @@ export default function App() {
   const [storefrontHasMore, setStorefrontHasMore] = useState(true);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
 
+  // হোমপেজ (ক্যাটাগরি সিলেক্ট নেই): শুধু নতুন ২০টা না দেখিয়ে সব ক্যাটাগরি থেকে মিক্স করে দেখানো হয়।
+  //  ১) featured/Best Seller পণ্য সবার আগে
+  //  ২) তারপর প্রতি ক্যাটাগরি থেকে একটা একটা করে (round-robin) — তাই সব ধরনের পণ্য একসাথে দেখা যায়
+  // প্রতিটা কোয়েরি where(...)+limit() — orderBy নেই, তাই composite index লাগে না।
+  // ক্যাটাগরি সিলেক্ট থাকলে আগের মতোই ওই ক্যাটাগরির পণ্য।
   useEffect(() => {
     setStorefrontLoading(true);
-    // ফিক্স: category filter + orderBy('createdAt') একসাথে থাকলে Firestore-এর
-    // composite index লাগে, যা এই প্রজেক্টে তৈরি করা নেই — ফলে ক্যাটাগরি সিলেক্ট
-    // করলে কোয়েরি silently fail করে প্রোডাক্ট খালি দেখাচ্ছিল।
-    // সমাধান: ক্যাটাগরি সিলেক্ট থাকলে orderBy বাদ দিয়ে (index লাগবে না),
-    // ডাটা আসার পরে createdAt দিয়ে নিজে sort করে দেওয়া হচ্ছে।
-    const storefrontQuery = selectedCategory
-      ? query(
-          collection(db, 'products'),
-          where('category', '==', selectedCategory),
-          limit(storefrontLimit)
-        )
-      : query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(storefrontLimit));
-
-    const unsub = onSnapshot(storefrontQuery, (snapshot) => {
-      let docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      if (selectedCategory) {
-        // ক্লায়েন্ট সাইডে সর্ট (নতুন প্রোডাক্ট আগে দেখানোর জন্য)
-        docs = docs.slice().sort((a, b) => {
-          const aTime = a.createdAt?.seconds || a.createdAt?.toMillis?.() || 0;
-          const bTime = b.createdAt?.seconds || b.createdAt?.toMillis?.() || 0;
-          return bTime - aTime;
-        });
-      }
-      setStorefrontProducts(docs);
-      // limit()-এর সমান বা বেশি ডকুমেন্ট এলে ধরে নিচ্ছি আরও থাকতে পারে
-      setStorefrontHasMore(docs.length >= storefrontLimit);
-      setStorefrontLoading(false);
-      setLoadingMoreProducts(false);
-    }, (err) => {
+    const getTime = (x) => x.createdAt?.seconds || x.createdAt?.toMillis?.() || 0;
+    const onErr = (err) => {
       console.error('Storefront products query failed:', err);
       setStorefrontLoading(false);
       setLoadingMoreProducts(false);
+    };
+
+    if (selectedCategory) {
+      const q = query(collection(db, 'products'), where('category', '==', selectedCategory), limit(storefrontLimit));
+      const unsub = onSnapshot(q, (snapshot) => {
+        let docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        docs = docs.slice().sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || getTime(b) - getTime(a));
+        setStorefrontProducts(docs);
+        setStorefrontHasMore(snapshot.docs.length >= storefrontLimit);
+        setStorefrontLoading(false);
+        setLoadingMoreProducts(false);
+      }, onErr);
+      return () => unsub();
+    }
+
+    const perCat = Math.max(2, Math.ceil(storefrontLimit / CATEGORIES.length));
+    const featuredLimit = Math.max(8, Math.ceil(storefrontLimit / 2));
+    const featuredDocs = { list: [] };
+    const catDocs = {};
+    const catFull = {};
+    const rebuild = () => {
+      const seen = new Set();
+      const out = [];
+      const featuredSorted = featuredDocs.list.slice().sort((a, b) => getTime(b) - getTime(a));
+      featuredSorted.forEach((p) => { if (!seen.has(p.id)) { seen.add(p.id); out.push(p); } });
+      const lists = CATEGORIES.map((c) => (catDocs[c.name] || []).slice().sort((a, b) => getTime(b) - getTime(a)));
+      const maxLen = Math.max(0, ...lists.map((l) => l.length));
+      for (let i = 0; i < maxLen; i++) {
+        lists.forEach((l) => {
+          const p = l[i];
+          if (p && !seen.has(p.id)) { seen.add(p.id); out.push(p); }
+        });
+      }
+      setStorefrontProducts(out);
+      setStorefrontHasMore(
+        Object.values(catFull).some(Boolean) || featuredDocs.list.length >= featuredLimit
+      );
+      setStorefrontLoading(false);
+      setLoadingMoreProducts(false);
+    };
+
+    const unsubs = [];
+    unsubs.push(onSnapshot(
+      query(collection(db, 'products'), where('featured', '==', true), limit(featuredLimit)),
+      (snap) => { featuredDocs.list = snap.docs.map((d) => ({ id: d.id, ...d.data() })); rebuild(); },
+      onErr
+    ));
+    CATEGORIES.forEach((c) => {
+      unsubs.push(onSnapshot(
+        query(collection(db, 'products'), where('category', '==', c.name), limit(perCat)),
+        (snap) => {
+          catDocs[c.name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          catFull[c.name] = snap.docs.length >= perCat;
+          rebuild();
+        },
+        onErr
+      ));
     });
-    return () => unsub();
+    return () => unsubs.forEach((u) => u());
   }, [selectedCategory, storefrontLimit]);
 
   // "আরও দেখুন"-এ ক্লিক করলে লিমিট আরও ২০ বাড়িয়ে দেয়
