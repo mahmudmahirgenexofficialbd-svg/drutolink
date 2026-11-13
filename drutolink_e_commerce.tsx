@@ -415,13 +415,8 @@ function ImageSlider() {
     <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
       <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${active * 100}%)` }}>
         {SLIDES.map((s, i) => (
-          <div key={i} className="min-w-full relative h-64 md:h-96 lg:h-[450px] bg-slate-900 overflow-hidden">
-            {/* Blurred Background for Premium Look */}
-            <div className="absolute inset-0 z-0">
-               <img src={s.image} alt="" className="w-full h-full object-cover blur-2xl opacity-60 scale-110" />
-            </div>
-            {/* Actual Image without cropping */}
-            <img src={s.image} alt={s.alt} className="absolute inset-0 z-10 w-full h-full object-contain drop-shadow-2xl" />
+          <div key={i} className="min-w-full relative h-36 sm:h-48 md:h-56 lg:h-64 bg-slate-900 overflow-hidden">
+            <img src={s.image} alt={s.alt} loading={i === 0 ? 'eager' : 'lazy'} className="absolute inset-0 w-full h-full object-cover object-center" />
           </div>
         ))}
       </div>
@@ -4415,7 +4410,7 @@ export default function App() {
           <section className="relative overflow-hidden bg-slate-50 border-b border-gray-200">
             <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-100/70 blur-3xl hero-glow" />
             <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-slate-200/70 blur-3xl" />
-            <div className="relative max-w-7xl mx-auto px-4 py-10 md:py-14 lg:py-16 grid lg:grid-cols-[1.05fr_.95fr] gap-10 items-center">
+            <div className="relative max-w-7xl mx-auto px-4 py-6 md:py-8 lg:py-10 grid lg:grid-cols-[1.05fr_.95fr] gap-6 lg:gap-10 items-center">
               <motion.div 
                 initial={{ opacity: 0, x: -30 }} 
                 animate={{ opacity: 1, x: 0 }} 
@@ -4474,7 +4469,7 @@ export default function App() {
           </section>
 
           {/* Image Slider Section */}
-          <section className="max-w-7xl mx-auto px-4 py-8">
+          <section className="max-w-7xl mx-auto px-4 py-4">
             <ImageSlider />
           </section>
 
@@ -4515,7 +4510,7 @@ export default function App() {
           </section>
 
           {/* Categories */}
-          <section className="max-w-7xl mx-auto px-4 py-10">
+          <section className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex items-center justify-between mb-4">
               <div><p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">Explore</p><h2 className="font-display text-2xl font-extrabold text-gray-900">ক্যাটাগরি থেকে পণ্য খুঁজুন</h2></div>
               {selectedCategory && (
@@ -4524,27 +4519,6 @@ export default function App() {
             </div>
             <CategoryScroller categories={CATEGORIES} selected={selectedCategory}
               onSelect={(name) => { setSelectedCategory(name === selectedCategory ? null : name); resetStorefrontPaging(); scrollToProducts(); }} />
-          </section>
-
-          {/* শিপিং ক্যালকুলেটর */}
-          <section className="max-w-7xl mx-auto px-4 pb-10">
-            <ShippingCalculator />
-          </section>
-
-          {/* How it works */}
-          <section ref={howItWorksRef} className="bg-red-700 text-white">
-            <div className="max-w-7xl mx-auto px-4 py-14">
-              <p className="text-red-100 text-xs font-bold uppercase tracking-wider mb-2">Simple process</p>
-              <h2 className="font-display text-2xl md:text-3xl font-extrabold mb-3">মাত্র ৩ ধাপে অর্ডার করুন</h2>
-              <p className="text-red-100 text-sm md:text-base mb-9">পণ্য নির্বাচন থেকে ডেলিভারি—প্রক্রিয়াটি সহজ রাখাই DrutoLink-এর লক্ষ্য।</p>
-              <div className="grid md:grid-cols-3 gap-8 md:gap-6 relative">
-                {[
-                  { n: '১', t: 'প্রোডাক্ট বাছাই করুন', d: 'ক্যাটালগ থেকে পছন্দের প্রোডাক্ট ও পরিমাণ বেছে নিন।' },
-                  { n: '২', t: 'বিকাশ/নগদে পেমেন্ট করুন', d: 'নির্দিষ্ট নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন।' },
-                  { n: '৩', t: 'আমরা সোর্স করে পাঠাই', d: 'চীন থেকে প্রোডাক্ট সংগ্রহ করে আপনার ঠিকানায় ডেলিভারি করি।' },
-                ].map((s, i) => <StepCard key={s.n} step={s} index={i} />)}
-              </div>
-            </div>
           </section>
 
           {/* Product grid */}
@@ -4659,6 +4633,27 @@ export default function App() {
             )}
             <div className="flex justify-center mt-6">
               <Link to="/products" className="text-sm font-semibold text-red-700 hover:underline">সব পণ্য ও ক্যাটাগরি দেখুন →</Link>
+            </div>
+          </section>
+
+          {/* শিপিং ক্যালকুলেটর */}
+          <section className="max-w-7xl mx-auto px-4 pb-10">
+            <ShippingCalculator />
+          </section>
+
+          {/* How it works */}
+          <section ref={howItWorksRef} className="bg-red-700 text-white">
+            <div className="max-w-7xl mx-auto px-4 py-14">
+              <p className="text-red-100 text-xs font-bold uppercase tracking-wider mb-2">Simple process</p>
+              <h2 className="font-display text-2xl md:text-3xl font-extrabold mb-3">মাত্র ৩ ধাপে অর্ডার করুন</h2>
+              <p className="text-red-100 text-sm md:text-base mb-9">পণ্য নির্বাচন থেকে ডেলিভারি—প্রক্রিয়াটি সহজ রাখাই DrutoLink-এর লক্ষ্য।</p>
+              <div className="grid md:grid-cols-3 gap-8 md:gap-6 relative">
+                {[
+                  { n: '১', t: 'প্রোডাক্ট বাছাই করুন', d: 'ক্যাটালগ থেকে পছন্দের প্রোডাক্ট ও পরিমাণ বেছে নিন।' },
+                  { n: '২', t: 'বিকাশ/নগদে পেমেন্ট করুন', d: 'নির্দিষ্ট নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন।' },
+                  { n: '৩', t: 'আমরা সোর্স করে পাঠাই', d: 'চীন থেকে প্রোডাক্ট সংগ্রহ করে আপনার ঠিকানায় ডেলিভারি করি।' },
+                ].map((s, i) => <StepCard key={s.n} step={s} index={i} />)}
+              </div>
             </div>
           </section>
 
