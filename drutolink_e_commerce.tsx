@@ -4,7 +4,6 @@ import slide1Asset from './slide1.png';
 import slide2Asset from './slide2.png';
 import slide3Asset from './slide3.png';
 import slide4Asset from './slide4.png';
-import slide5Asset from './slide5.png';
 import promoPopupAsset from './promo-popup.jpg';
 import shipmentWarehouseAsset from './shipment-warehouse.jpg';
 import shipmentDeliveryAsset from './shipment-delivery.jpg';
@@ -385,58 +384,6 @@ const CATEGORIES = [
   { name: 'বিউটি ও কসমেটিক্স', emoji: '💄' },
   { name: 'মোবাইল এক্সেসরিজ', emoji: '📱' },
 ];
-
-const SLIDES = [
-  { image: slide1Asset, alt: 'ফ্যাক্টরি ভিজিট' },
-  { image: slide2Asset, alt: 'ওয়্যারহাউস' },
-  { image: slide3Asset, alt: 'পণ্য চেকিং' },
-  { image: slide4Asset, alt: 'ডেলিভারি ভ্যান' },
-  { image: slide5Asset, alt: 'কাস্টমার রিসিভ' },
-];
-
-// --- IMAGE SLIDER ---
-function ImageSlider() {
-  const [active, setActive] = useState(0);
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setActive((i) => (i + 1) % SLIDES.length);
-    }, 4500);
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  const goTo = (i) => {
-    clearInterval(timerRef.current);
-    setActive(i);
-  };
-
-  return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
-      <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${active * 100}%)` }}>
-        {SLIDES.map((s, i) => (
-          <div key={i} className="min-w-full relative h-36 sm:h-48 md:h-56 lg:h-64 bg-slate-900 overflow-hidden">
-            <img src={s.image} alt={s.alt} loading={i === 0 ? 'eager' : 'lazy'} className="absolute inset-0 w-full h-full object-cover object-center" />
-          </div>
-        ))}
-      </div>
-      <button onClick={() => goTo((active - 1 + SLIDES.length) % SLIDES.length)}
-        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-900 rounded-full p-1.5 shadow-sm transition-all duration-150 hover:scale-105">
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-      <button onClick={() => goTo((active + 1) % SLIDES.length)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-900 rounded-full p-1.5 shadow-sm transition-all duration-150 hover:scale-105">
-        <ChevronRight className="h-5 w-5" />
-      </button>
-      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
-        {SLIDES.map((_, i) => (
-          <button key={i} onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-all duration-300 ${i === active ? 'w-6 bg-red-600' : 'w-2 bg-white/70 hover:bg-white/90'}`} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function RouteGraphic() {
   return (
@@ -4466,11 +4413,6 @@ export default function App() {
                 </div>
               </motion.div>
             </div>
-          </section>
-
-          {/* Image Slider Section */}
-          <section className="max-w-7xl mx-auto px-4 py-4">
-            <ImageSlider />
           </section>
 
           {/* Quick service actions */}
