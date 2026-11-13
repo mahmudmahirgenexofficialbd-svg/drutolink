@@ -27,7 +27,7 @@ import {
   ContactPage, FaqPage, NotFoundPage, ShippingCalculator,
 } from './StaticPages';
 import { ProductsPage, ProductPage } from './StorePages';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, limit,
   serverTimestamp, updateDoc, setDoc, getDoc, runTransaction,
@@ -326,6 +326,11 @@ html { scroll-behavior: smooth; }
 @keyframes heroGlow { 0%,100% { opacity:.55; transform:scale(1); } 50% { opacity:.8; transform:scale(1.04); } }
 @keyframes routePulse { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
 .hero-glow { animation: heroGlow 5s ease-in-out infinite; }
+@keyframes auraShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.hero-aurora { background: linear-gradient(120deg, rgba(254,226,226,.75), rgba(241,245,249,.2), rgba(254,202,202,.55), rgba(226,232,240,.3)); background-size: 300% 300%; animation: auraShift 14s ease-in-out infinite; }
+@keyframes btnShine { 0% { transform: translateX(-120%) skewX(-20deg); } 60%,100% { transform: translateX(260%) skewX(-20deg); } }
+.btn-shine { position: relative; overflow: hidden; }
+.btn-shine::after { content:''; position:absolute; top:0; left:0; width:40%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); animation: btnShine 3.2s ease-in-out infinite; pointer-events:none; }
 .route-pulse { animation: routePulse 3s ease-in-out infinite; }
 .product-trust-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
 .product-trust-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(15,23,42,.07); border-color:#e5e7eb; }
@@ -354,7 +359,7 @@ html { scroll-behavior: smooth; }
 .reveal-step-in .step-badge:hover { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash, .cat-marquee-track, .reveal-step-in, .reveal-step-in .step-badge {
+  .animate-hero-in, .animate-hero-in-delay, .animate-fade-in, .animate-scale-in, .animate-float, .route-dash, .cat-marquee-track, .hero-aurora, .btn-shine::after, .reveal-step-in, .reveal-step-in .step-badge {
     animation: none !important;
   }
   .reveal-step { opacity: 1; }
@@ -384,6 +389,29 @@ const CATEGORIES = [
   { name: 'বিউটি ও কসমেটিক্স', emoji: '💄' },
   { name: 'মোবাইল এক্সেসরিজ', emoji: '📱' },
 ];
+
+// --- MOTION HELPERS ---
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 28, mass: 0.4 });
+  return <motion.div style={{ scaleX }} className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-red-600 via-rose-500 to-red-700 origin-left z-[70] pointer-events-none" />;
+}
+function ParallaxBlob({ className, speed = 100 }) {
+  const { scrollY } = useScroll();
+  const y = useTransform(scrollY, [0, 700], [0, speed]);
+  return <motion.div style={{ y }} className={className} />;
+}
+function Reveal({ children, delay = 0, className = '' }) {
+  return (
+    <motion.div className={className}
+      initial={{ opacity: 0, y: 40, filter: 'blur(8px)' }}
+      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 0.85, delay, ease: [0.16, 1, 0.3, 1] }}>
+      {children}
+    </motion.div>
+  );
+}
 
 function RouteGraphic() {
   return (
@@ -4353,10 +4381,12 @@ export default function App() {
         </>
       ) : (
         <>
+          <ScrollProgress />
           {/* Homepage 2.0 — premium hero */}
           <section className="relative overflow-hidden bg-slate-50 border-b border-gray-200">
-            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-100/70 blur-3xl hero-glow" />
-            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-slate-200/70 blur-3xl" />
+            <div className="absolute inset-0 hero-aurora" />
+            <ParallaxBlob speed={140} className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-red-100/70 blur-3xl hero-glow" />
+            <ParallaxBlob speed={-60} className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-slate-200/70 blur-3xl" />
             <div className="relative max-w-7xl mx-auto px-4 py-6 md:py-8 lg:py-10 grid lg:grid-cols-[1.05fr_.95fr] gap-6 lg:gap-10 items-center">
               <motion.div 
                 initial={{ opacity: 0, x: -30 }} 
@@ -4368,13 +4398,14 @@ export default function App() {
                   <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" /> China → Bangladesh
                 </div>
                 <h1 className="font-display text-4xl md:text-5xl lg:text-[3.35rem] font-extrabold leading-[1.08] tracking-tight text-slate-950 mt-5">
-                  চীন থেকে পছন্দের পণ্য,<br /><span className="text-red-600">সহজে আপনার ঠিকানায়</span>
+                  <motion.span className="block" initial={{ opacity: 0, y: 40, filter: 'blur(12px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 0.9, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}>চীন থেকে পছন্দের পণ্য,</motion.span>
+                  <motion.span className="block text-red-600" initial={{ opacity: 0, y: 40, filter: 'blur(12px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 0.9, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}>সহজে আপনার ঠিকানায়</motion.span>
                 </h1>
                 <p className="mt-5 text-gray-600 text-base md:text-lg leading-8 max-w-xl">
                   পণ্য খুঁজুন, অর্ডার দিন—চীন থেকে সোর্সিং, অর্ডার প্রসেসিং এবং বাংলাদেশে ডেলিভারির পুরো প্রক্রিয়া এক জায়গায়।
                 </p>
                 <div className="mt-7 flex flex-col sm:flex-row gap-3">
-                  <button onClick={scrollToProducts} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3.5 rounded-xl transition-all duration-200 hover:shadow-xl hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
+                  <button onClick={scrollToProducts} className="btn-shine bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3.5 rounded-xl transition-all duration-200 hover:shadow-xl hover:shadow-red-600/20 hover:-translate-y-0.5 active:translate-y-0">
                     পণ্য খুঁজুন <ChevronRight className="inline-block h-4 w-4 ml-1" />
                   </button>
                   <button onClick={openImageSearch} className="bg-white border border-gray-300 hover:border-red-300 hover:bg-red-50/50 text-gray-800 font-bold px-6 py-3.5 rounded-xl transition-all duration-200">
@@ -4395,7 +4426,7 @@ export default function App() {
                 className="relative animate-hero-in-delay"
               >
                 <div className="absolute -inset-4 rounded-[2rem] bg-red-100/60 blur-2xl" />
-                <div className="relative bg-white rounded-[2rem] border border-gray-200 p-5 md:p-7 shadow-xl shadow-slate-200/70">
+                <div className="relative animate-float bg-white rounded-[2rem] border border-gray-200 p-5 md:p-7 shadow-xl shadow-slate-200/70">
                   <div className="flex items-center justify-between mb-5">
                     <div><p className="text-xs text-gray-500">DrutoLink delivery route</p><p className="font-display font-bold text-lg text-gray-900">চীন → বাংলাদেশ</p></div>
                     <span className="h-10 w-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center"><Package className="h-5 w-5" /></span>
@@ -4416,6 +4447,7 @@ export default function App() {
           </section>
 
           {/* Quick service actions */}
+          <Reveal>
           <section className="bg-white border-b border-gray-100">
             <div className="max-w-7xl mx-auto px-4 py-6 md:py-7 grid md:grid-cols-3 gap-3">
               {[
@@ -4431,8 +4463,10 @@ export default function App() {
               ))}
             </div>
           </section>
+          </Reveal>
 
-          {/* Trust strip */}
+{/* Trust strip */}
+          <Reveal>
           <section className="bg-white border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {[
@@ -4450,8 +4484,10 @@ export default function App() {
               ))}
             </div>
           </section>
+          </Reveal>
 
-          {/* Categories */}
+{/* Categories */}
+          <Reveal>
           <section className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex items-center justify-between mb-4">
               <div><p className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">Explore</p><h2 className="font-display text-2xl font-extrabold text-gray-900">ক্যাটাগরি থেকে পণ্য খুঁজুন</h2></div>
@@ -4462,8 +4498,9 @@ export default function App() {
             <CategoryScroller categories={CATEGORIES} selected={selectedCategory}
               onSelect={(name) => { setSelectedCategory(name === selectedCategory ? null : name); resetStorefrontPaging(); scrollToProducts(); }} />
           </section>
+          </Reveal>
 
-          {/* Product grid */}
+{/* Product grid */}
           <section ref={productsRef} className="max-w-7xl mx-auto px-4 py-12">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="font-display text-xl font-bold text-gray-900">
@@ -4518,10 +4555,10 @@ export default function App() {
                   return (
                     <motion.div 
                       key={p.id} 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-50px" }}
-                      transition={{ duration: 0.4, delay: (index % 10) * 0.05 }}
+                      initial={{ opacity: 0, y: 36, scale: 0.95 }}
+                      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                      viewport={{ once: true, margin: "-40px" }}
+                      transition={{ duration: 0.65, delay: (index % 5) * 0.07, ease: [0.16, 1, 0.3, 1] }}
                       className="group bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/70 hover:-translate-y-1 hover:border-gray-300"
                     >
                       <button onClick={() => setDetailProduct(p)} className="block overflow-hidden relative w-full">
@@ -4579,11 +4616,14 @@ export default function App() {
           </section>
 
           {/* শিপিং ক্যালকুলেটর */}
+          <Reveal>
           <section className="max-w-7xl mx-auto px-4 pb-10">
             <ShippingCalculator />
           </section>
+          </Reveal>
 
-          {/* How it works */}
+{/* How it works */}
+          <Reveal>
           <section ref={howItWorksRef} className="bg-red-700 text-white">
             <div className="max-w-7xl mx-auto px-4 py-14">
               <p className="text-red-100 text-xs font-bold uppercase tracking-wider mb-2">Simple process</p>
@@ -4598,6 +4638,7 @@ export default function App() {
               </div>
             </div>
           </section>
+          </Reveal>
 
           <AboutSection />
 
