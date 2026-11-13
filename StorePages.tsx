@@ -242,6 +242,8 @@ export function ProductPage({ productId, knownProducts, onAddToCart, getWeightKg
     if (!product) return;
     onApplyMeta(`${product.title} — দাম ও অর্ডার | ${SITE.name}`,
       `${product.title} এখন ৳${product.price} টাকায়। চীন থেকে সোর্সিং ও বাংলাদেশে ডেলিভারি — ${SITE.name}।`);
+    // সার্ভার (api/product-page.js) প্রথম লোডে একটা Product JSON-LD বসিয়ে দেয়; ডুপ্লিকেট এড়াতে মুছে ক্লায়েন্টেরটা বসাই
+    document.querySelectorAll('script[data-ssr="product"]').forEach((n) => n.remove());
     const el = document.createElement('script');
     el.type = 'application/ld+json';
     el.text = JSON.stringify({

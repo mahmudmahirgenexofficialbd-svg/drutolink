@@ -3,6 +3,8 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/product/:id", "destination": "/api/product-page?id=:id" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
